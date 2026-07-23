@@ -7,3 +7,4 @@ npm-debug.log*
 .env*.local
 .claude/settings.local.json
 *.tsbuildinfo
+.vercel

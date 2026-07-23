@@ -209,6 +209,36 @@ Full version history: V1 through V5 are the original single-file HTML/CSS/JS pro
 
 ---
 
+## V7.1 — Setup wizard visual redesign, viewport-height fix (2026-07-22)
+
+**Requested changes:**
+1. Fix the Continue button leaving a large blank gap on shorter wizard pages when page heights differ.
+2. Restyle the "Event details" page (and, by extension, the rest of the wizard) after an iOS Calendar-style "New Event" sheet reference — grouped rounded card sections, circular back/close button, centered title — reinterpreted in the app's matcha/paper-texture scrapbook aesthetic rather than copied literally.
+
+**The height bug, and why the first fix attempt didn't work:** `.wizard-track` (the horizontal 3-page flex row) used the default `align-items: stretch`, which forces every page's *rendered* height to match the tallest page (the menu-builder page) — even though only one page is visible at a time. A first fix attempt measured each page's `scrollHeight` via `ResizeObserver` and applied it to the viewport, but that alone didn't work: `scrollHeight` reflects the *already-stretched* box, so every page kept reporting the same (tallest) height regardless of its real content. The actual fix was adding `align-items: flex-start` to `.wizard-track` so each page's box height reflects only its own content — *then* the `ResizeObserver` measurement became meaningful. Confirmed via direct height reads: 274px (event details) → 748px (menu) → 151px (empty inventory).
+
+**Visual changes:**
+- New `.detail-card`/`.detail-row` pattern: rounded paper cards with divided rows (label left, pill-style value right) — replaces the old plain stacked `.field-group` inputs on page 1, and the boxed `.menu-row` cards on page 2 (drink/syrup/milk/item rows now render as name + price pill + remove button inside one grouped card per section) and page 3 (inventory rows: name + type tag + count pill, one card).
+- New `.wizard-topbar`: a circular ✕ (page 1, cancels to home) / ← (pages 2–3, previous page) button + centered title, replacing the old left-aligned text link and heading. The bottom-of-page "← Back" button was removed as redundant once the top circular button covered all back-navigation.
+- Removed now-dead CSS (`.menu-row`, `.menu-row-bottom`, `.remove-btn`, `.syrup-row`, old `.setup-header`) since nothing renders with those classes anymore.
+
+**Validation:** full regression re-run after the redesign — page-to-page navigation, menu template save, priced syrup/milk entry, inventory fill, event creation — all confirmed working via the headless-browser driver, including catching and fixing two of the driver script's own selector-indexing mistakes along the way (not app bugs — `.detail-pill-input` and `.detail-title-input` are intentionally reused across multiple wizard pages for style consistency, which meant naive `nth()` indexing in the test script undercounted).
+
+---
+
 ## Mobile port started (2026-07-23)
 
 A React Native / Expo port of this app has begun as a **separate sibling project**, `../sencha_mobile/`, not a conversion of this codebase — this Next.js app stays as-is, fully intact, as the reference implementation. See `sencha_mobile/CLAUDE.md` and `sencha_mobile/CHANGELOG.md` for that project's own status and history; nothing in this repository changes as a result of that work.
+
+---
+
+## Deployed to Vercel (2026-07-23)
+
+**Decision:** with the mobile port still early (see above), priority shifted back to the web app — get it live on a real URL rather than continuing mobile work first.
+
+**What was done:**
+- Initialized git in `sencha_app` for the first time (it had never been a repo before this). `.gitignore` extended to exclude `.claude/settings.local.json` (personal local tool config, not project config), `*.tsbuildinfo` (generated build artifact), and `.vercel` (Vercel's local project-link metadata, written by the CLI below).
+- Deployed via `vercel` CLI (`npx vercel --yes`) — Vercel auto-detected the Next.js project, ran `npm install` + `next build` in its own cloud build environment, and since this was the project's first deployment, published it directly to production and aliased it at **https://senchaapp.vercel.app**.
+- Verified the live deployment with the same headless-browser check used throughout this project: loads correctly, no console errors.
+
+**Not done / next steps:** no custom domain, no environment variables configured (none are needed yet — still fully client-side/`localStorage`-backed, see `DECISIONS.md`), no CI — every future deploy is currently a manual `vercel --yes` (or `vercel --prod` once there's a reason to distinguish preview vs. production deploys, e.g. once this is connected to a GitHub repo for automatic per-PR previews).

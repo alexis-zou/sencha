@@ -54,6 +54,12 @@ A running log of consequential decisions, why they were made, and what would tri
 
 ## Architecture decisions
 
+### Deployed via direct `vercel` CLI, not a GitHub-connected project
+**Decision:** The first production deploy (https://senchaapp.vercel.app) was pushed straight from the local machine via `npx vercel --yes`, rather than pushing to GitHub first and importing the repo through Vercel's dashboard.
+**Why:** Fastest path to "live URL to look at" when that was the explicit priority — no waiting on a GitHub repo creation/OAuth-import flow. `git init` still happened locally (a real prerequisite regardless, and good practice on its own), just not pushed to a remote yet.
+**Known consequence:** every deploy right now is a manual `vercel --yes`/`vercel --prod` run from this machine — no automatic deploy-on-push, no per-PR preview URLs, no deploy history tied to commits. This is a real gap for anything beyond solo iteration.
+**Revisit when:** the moment there's a GitHub remote worth having anyway (collaborators, backup, PR review) — connecting that repo in the Vercel dashboard is a five-minute change that adds CI-style auto-deploy without touching app code. Don't keep deploying by hand past that point.
+
 ### Local-first persistence, no backend yet
 **Decision:** All data lives in `localStorage`, wrapped by `lib/storage.ts`'s small async `get/set/delete` interface — deliberately shaped to mirror Claude.ai's artifact `window.storage` API that the original prototype used.
 **Why:** This lets the entire UI/UX be iterated on quickly (including inside Claude.ai during prototyping) without needing a database, hosting, or auth infrastructure decision made up front. It also means this Next.js port could be done as a pure UI recreation without needing new backend design decisions to be made under pressure.

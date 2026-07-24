@@ -38,8 +38,8 @@ Per `DECISIONS.md`'s product-decision note: add an optional cost-per-unit field 
 ### 10. Add "duplicate event as template" from Home
 Recurring markets reuse the same menu/prices/syrups. Add a "Duplicate" action on an ended event's card (or a menu on the card) that opens Setup pre-filled with that event's menu/add-ons/syrups/inventory defaults, just needing a new name/date.
 
-### 11. Add export/share of a past event summary
-A shareable/downloadable version of the Summary screen — likely simplest as a server-rendered image or PDF once a backend exists (item #6), useful for taxes, splitting income with a partner, or just posting online. Client-side-only options (e.g. `html2canvas`) could work before the backend lands, if this is wanted sooner.
+### 11. ~~Add export/share of a past event summary~~ — Done
+`SummaryScreen.tsx`'s "🖨️ Export as PDF" button uses the browser's native print dialog (`window.print()`) against a dedicated `@media print` stylesheet, rather than a PDF-generation library (`jspdf`/`html2canvas`) — "Save as PDF" from that dialog is the export path. See `DECISIONS.md` for why. Revisit if a one-click silent download (no print dialog) becomes a real requirement.
 
 ### 12. Add password reset flow
 Blocked on #5 (real backend + real email delivery). Until then, keep the current UI honest that this doesn't exist rather than implying it might.
@@ -47,8 +47,8 @@ Blocked on #5 (real backend + real email delivery). Until then, keep the current
 ### 13. Add reorder/duplicate for a line item within the order panel
 Small quality-of-life addition to `OrderPanel`/`ItemPickerModal` — e.g. a "+1 more of this" shortcut when the same drink with the same customization is ordered again in the same session.
 
-### 14. Add optional pricing on syrup add-ons
-Currently syrups are free flavor options with no upcharge. Add an optional price field per syrup (setup + `ItemPickerModal`), added into the line item's total the same way qty currently multiplies price.
+### 14. ~~Add optional pricing on syrup add-ons~~ — Done (V7)
+Both syrup and milk are now `FlavorOption[]` with an optional per-unit price, entered at setup and shown inline in `ItemPickerModal` (e.g. "Oat Milk (+$0.75)"). Folded into the line item's total via `lineTotal()`. This was completed in the V7 setup-wizard redesign but not marked here until now.
 
 ### 15. Support more than 3 inventory categories
 The `Category` type (`'matcha' | 'bread' | 'cookie'`) and the Inventory page's fixed three-card layout are both hardcoded. Generalize to an arbitrary list of tracked inventory items, each with its own name/icon/depletion visual — deferred since V2 of the original prototype, still not needed until a stand actually sells a fourth trackable item type.

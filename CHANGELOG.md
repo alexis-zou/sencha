@@ -242,3 +242,38 @@ A React Native / Expo port of this app has begun as a **separate sibling project
 - Verified the live deployment with the same headless-browser check used throughout this project: loads correctly, no console errors.
 
 **Not done / next steps:** no custom domain, no environment variables configured (none are needed yet — still fully client-side/`localStorage`-backed, see `DECISIONS.md`), no CI — every future deploy is currently a manual `vercel --yes` (or `vercel --prod` once there's a reason to distinguish preview vs. production deploys, e.g. once this is connected to a GitHub repo for automatic per-PR previews).
+
+---
+
+## V8 — Cute icons, handwritten order sheet, live/historical summaries, PDF export (2026-07-23)
+
+**Requested changes (7 parts, reference mood images: a cute bakery-app menu, a vintage recipe/binder card, a notebook-paper item card, a spy-dossier evidence set, watercolor folder icons, a stylized shopping receipt):**
+1. Keep the `$` visible in menu price inputs while typing, not just as a placeholder.
+2. Cute type-specific inventory icons (matcha drink / cookie) whose fill/bite visibly changes as stock depletes, plus a progress bar per item that turns red under 10 remaining.
+3. Restyle the order-entry panel as a handwritten paper order sheet (kraft-paper texture, "down-to-earth correspondence" feel); remove the Ice customization; keep/confirm a cute completion animation.
+4. More translucent bottom nav, with a clearer active-tab indicator.
+5. Remove the washi-tape heading accent; give each screen its own matcha-toned gradient background.
+6. A new **live** "Event Summary" nav tab, postcard-styled, showing per-item sales, favorite syrup/milk, income, and order counts while an event is still active.
+7. Home-screen events styled as file folders; opening an ended one shows a receipt-styled summary with a barcode, exportable as a PDF.
+
+**1. `$` prefix (`SetupScreen.tsx`):** `type="number"` inputs can't have a literal `$` baked into their value, so a `$` span is positioned as a fixed overlay with left-padding on the input, instead of a placeholder (which disappears the moment you type). First attempt used `placeholder="0"` alongside it, which visually read as "$0" — a value, not a hint — for an empty field; removed.
+
+**2. Inventory — cute icons + progress bars:**
+- New `icons/MatchaDrinkIcon.tsx` (cup, straw, cute face, liquid level) and `icons/CookieIcon.tsx` (chip-studded cookie, cute face, growing bite) replace the generic `StockIcon` — dispatched by `MenuItem.type`.
+- The floating numeric badge was replaced by an actual `<div>`-based progress bar (`.inv-progress-track`/`.inv-progress-fill`), colored `--sage` normally and a new `--danger-light` token (a soft pink-red tint of `--danger`, following `DESIGN.md`'s "extend the existing family" rule) once remaining stock is **below 10** — an absolute threshold, replacing the old `badgeClass()`'s 15%-of-starting-stock logic. `badgeClass()`'s signature dropped its now-unused `start` parameter.
+
+**3. Order sheet redesign + Ice removal:**
+- `OrderPanel.tsx`/`globals.css`: warm kraft-paper grain background (same turbulence-filter SVG technique as the app-wide paper texture, tinted toward `--bread` and boosted in opacity — reused again for the summary postcard and the receipt, for a consistent "paper surface" family), a dashed underline note field, item names in the handwritten heading font, and a small rotated "✎ jot it down" stamp.
+- Ice removed end-to-end: `ICE_OPTIONS` (`lib/constants.ts`), `OrderLineItem.ice` (`lib/types.ts`), the `ice` param of `customBitsFor()` (`lib/calculations.ts`), and the Ice `<select>` in `ItemPickerModal.tsx`.
+- The completion burst (already existed, `TicketCard.tsx`) got a small refresh — added 🍵 to the emoji set.
+
+**4–5. Nav bar + page backgrounds:** bottom nav background opacity dropped (0.72 → 0.48) and blur increased for a more translucent glass feel; the active tab now shows a pale pill behind its icon (`.nav-icon-pill`) instead of relying on text color alone. `.tape-heading` (and its usage in 5 components) removed; each top-level screen (`#auth-view`, `#home-view`, `#setup-view`, `#main-view`, `#summary-view`) now gets its own `linear-gradient(165deg, var(--cream), var(--pale))` background.
+
+**6. Live Event Summary tab:** new `lib/calculations.ts` export `computeEventStats(event)` — aggregates *completed* orders into income, order counts (total/completed/pending), average order value, per-item quantity **and dollar subtotal** sold, and the most-ordered syrup/milk. New `SummaryPage.tsx` (third `MainPage` tab, alongside `'orders' | 'inventory'`) renders these as a postcard-styled card. `lib/types.ts`'s `MainPage` type gained `'summary'` — deliberately distinct from `ViewName`'s existing `'summary'` (the *ended-event* read-only screen); the two are unrelated types, but see the comment in `lib/types.ts` flagging the naming overlap for future readers.
+
+**7. Folders + receipt + barcode + PDF export:**
+- `HomeScreen.tsx`: event cards renamed `event-folder`, with a small tab shape (`::before`-style pseudo-element via a sibling span) peeking above the card; ended events show a "Tap to view receipt →" hint.
+- `SummaryScreen.tsx` rewritten around a `.receipt` card reusing `computeEventStats()`: itemized lines with dotted leaders and per-item subtotals, a total, completed/pending order counts, top syrup/milk, a "thank you for stopping by" line, and a new `icons/Barcode.tsx` (bars deterministically derived from the event's `id` via a simple string hash — decorative only, not a real scannable symbology).
+- **PDF export**: an "🖨️ Export as PDF" button calls `window.print()`; a new `@media print` block hides everything marked `.no-print` (back link, export button itself, the per-order ticket list) so the printed/saved output is just the receipt + final inventory. No PDF-generation library was added — see `DECISIONS.md` for why, and the tradeoff.
+
+**Validation:** every sub-feature verified via the project's established headless-browser driver approach, including a full regression pass at the end (menu template save/reuse, priced syrup/milk math end-to-end, low-stock warning, Settings modal, live Summary tab math, folder → receipt → PDF-export button, inventory red state) — `tsc --noEmit` clean throughout, no console errors in any flow. `ROADMAP.md` #11 (export/share summary) is now done; #14 (priced syrup add-ons) was actually completed back in V7 but never marked — corrected here.

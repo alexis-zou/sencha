@@ -27,7 +27,7 @@ export default function TicketCard({
   useEffect(() => {
     if (!wasDoneRef.current && order.done) {
       setJustCompleted(true);
-      burstEffect(checkRef.current, ['✅', '🍃', '✨']);
+      burstEffect(checkRef.current, ['✅', '🍵', '🍃', '✨']);
       const t = setTimeout(() => setJustCompleted(false), 460);
       wasDoneRef.current = order.done;
       return () => clearTimeout(t);

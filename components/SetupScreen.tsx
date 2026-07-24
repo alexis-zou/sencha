@@ -150,15 +150,17 @@ export default function SetupScreen() {
               value={row.name}
               onChange={(e) => updateRow(setter, row.id, { name: e.target.value })}
             />
-            <input
-              className="detail-pill-input detail-pill-input-price"
-              type="number"
-              min={0}
-              step="0.25"
-              placeholder="$"
-              value={row.price}
-              onChange={(e) => updateRow(setter, row.id, { price: e.target.value })}
-            />
+            <span className="price-input-wrap">
+              <span className="price-prefix">$</span>
+              <input
+                className="detail-pill-input detail-pill-input-price"
+                type="number"
+                min={0}
+                step="0.25"
+                value={row.price}
+                onChange={(e) => updateRow(setter, row.id, { price: e.target.value })}
+              />
+            </span>
             <button className="detail-row-remove" type="button" onClick={() => removeRow(setter, row.id)} aria-label="Remove">
               ×
             </button>
@@ -181,7 +183,7 @@ export default function SetupScreen() {
         </button>
         <div className="wizard-topbar-title">
           <span className="eyebrow">Step {page + 1} of {PAGE_COUNT}</span>
-          <h1 className="tape-heading">{PAGE_TITLES[page]}</h1>
+          <h1>{PAGE_TITLES[page]}</h1>
         </div>
         <div className="wizard-icon-btn-spacer" aria-hidden="true" />
       </div>

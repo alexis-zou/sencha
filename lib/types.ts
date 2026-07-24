@@ -1,6 +1,6 @@
 // Core domain types for Matcha Stand.
 
-// 'drink' items prompt for syrup/milk/ice customization when added to an
+// 'drink' items prompt for syrup/milk customization when added to an
 // order; 'item' is any other product (food, merch) sold at a flat price.
 export type MenuItemType = 'drink' | 'item';
 
@@ -31,7 +31,6 @@ export interface OrderLineItem {
   milkId?: string;
   milkName?: string;
   milkPrice?: number;
-  ice?: string;
 }
 
 export interface Order {
@@ -73,5 +72,8 @@ export interface MenuTemplate {
 }
 
 export type ViewName = 'auth' | 'home' | 'setup' | 'main' | 'summary';
-export type MainPage = 'orders' | 'inventory';
+// Tabs inside an active event's MainScreen. Note 'summary' here means the
+// live, in-progress postcard tab (SummaryPage) — distinct from ViewName's
+// 'summary', which is the read-only screen for an *ended* event.
+export type MainPage = 'orders' | 'inventory' | 'summary';
 export type AuthMode = 'signin' | 'signup';

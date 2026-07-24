@@ -12,7 +12,7 @@ export default function HomeScreen() {
     <div id="home-view">
       <div className="home-header">
         <div>
-          <h1 className="tape-heading">Your Stands</h1>
+          <h1>Your Stands</h1>
           <div className="sub">{currentUser}</div>
         </div>
         <button className="signout-btn" onClick={() => signOut()}>
@@ -52,7 +52,8 @@ export default function HomeScreen() {
             sorted.map((ev) => {
               const profit = totalProfit(ev);
               return (
-                <div key={ev.id} className="event-card" onClick={() => openEvent(ev.id)}>
+                <div key={ev.id} className="event-folder" onClick={() => openEvent(ev.id)}>
+                  <span className="event-folder-tab" aria-hidden="true" />
                   <div className="event-card-top">
                     <div>
                       <div className="event-card-name">{ev.eventName}</div>
@@ -68,6 +69,7 @@ export default function HomeScreen() {
                       Orders <b>{ev.orders.length}</b>
                     </span>
                   </div>
+                  {ev.status === 'ended' && <div className="event-folder-hint">Tap to view receipt →</div>}
                 </div>
               );
             })

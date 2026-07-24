@@ -9,6 +9,7 @@
     --pale: #DDE3BA;
     --paper: #FBFAF5;
     --danger: #A6523A;
+    --danger-light: #D99C8C;
     --bread: #C9A66B;
     --cookie: #8B5E3C;
     --radius: 18px;
@@ -30,6 +31,14 @@
   }
   #app > *{ position: relative; z-index: 1; }
 
+  /* Each top-level screen gets its own soft matcha gradient rather than
+     sitting flush against #app's flat cream — keeps screens feeling like
+     distinct "pages" instead of blending into one continuous background. */
+  #auth-view, #home-view, #setup-view, #main-view, #summary-view{
+    min-height: 100vh;
+    background: linear-gradient(165deg, var(--cream) 0%, var(--pale) 100%);
+  }
+
   .field-label{ font-size: 13px; font-weight: 700; color: var(--deep); margin-bottom: 7px; display:block; }
   .field-group{ margin-bottom: 22px; }
 
@@ -49,13 +58,6 @@
   .primary-btn:active{ transform: scale(0.99); }
   .error-text{ color: var(--danger); font-size: 13px; margin-top: 8px; font-weight: 700; }
   .hidden{ display: none !important; }
-
-  /* ---------- washi tape accent on major headings ---------- */
-  .tape-heading{ position: relative; display: inline-block; }
-  .tape-heading::before{
-    content:''; position:absolute; left:-10px; top:-4px; width: 64%; height: 40%;
-    background: rgba(146,170,88,0.35); transform: rotate(-2.5deg); z-index:-1; border-radius:2px;
-  }
 
   /* ---------- Auth view ---------- */
   .auth-wrap{ padding: 60px 24px 40px; display:flex; flex-direction: column; align-items:center; }
@@ -94,10 +96,20 @@
   }
   .new-event-btn:active{ transform: scale(0.99); }
 
-  .event-card{
-    background: var(--paper); border-radius: 16px; padding: 16px 18px; margin-bottom: 12px;
-    box-shadow: var(--shadow); display:flex; flex-direction: column; gap: 6px;
+  /* Each saved event reads as a little manila file folder — a tab peeking
+     out the top-left, retrieved by tapping it (matches the "stored in
+     folders, retrieved as a receipt" framing for ended events). */
+  .event-folder{
+    position: relative; background: var(--paper); border-radius: 4px 16px 16px 16px;
+    padding: 16px 18px; margin: 20px 0 12px; box-shadow: var(--shadow);
+    display:flex; flex-direction: column; gap: 6px;
   }
+  .event-folder-tab{
+    position: absolute; top: -13px; left: 14px; width: 74px; height: 15px;
+    background: var(--paper); border-radius: 8px 8px 0 0;
+    box-shadow: 0 -1px 0 rgba(69,88,38,0.06);
+  }
+  .event-folder-hint{ font-size: 11.5px; color: var(--mid); font-weight: 700; margin-top: 2px; }
   .event-card-top{ display:flex; justify-content:space-between; align-items:flex-start; }
   .event-card-name{ font-size: 20px; font-weight: 400; color: var(--deep); font-family:'Patrick Hand',cursive; }
   .event-card-date{ font-size: 12.5px; color: var(--mid); margin-top: 2px; }
@@ -152,7 +164,12 @@
   /* detail-row variant used for repeatable menu rows (name + price + remove) */
   .detail-row-menu{ gap: 8px; }
   .detail-row-menu .detail-title-input{ flex: 1; min-width: 0; }
-  .detail-pill-input-price{ min-width: 0; width: 78px; padding: 7px 10px; }
+  .price-input-wrap{ position: relative; flex: none; }
+  .price-input-wrap .price-prefix{
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    font-family: 'Quicksand', sans-serif; font-weight: 700; font-size: 14px; color: var(--mid); pointer-events: none;
+  }
+  .detail-pill-input-price{ min-width: 0; width: 74px; padding: 7px 10px 7px 22px; text-align: left; }
   .detail-row-remove{
     flex: none; width: 28px; height: 28px; border-radius: 8px; border: none;
     background: var(--cream); color: var(--danger); font-size: 16px;
@@ -248,8 +265,27 @@
   }
   .add-btn:active{ transform: scale(0.99); }
 
-  .order-panel{ background: var(--paper); border-radius: var(--radius); padding: 18px; margin-top: 14px; box-shadow: var(--shadow); }
-  .order-panel h3{ font-size: 22px; margin-bottom: 12px; }
+  /* Order sheet — leans into "jotting down a handwritten order on kraft
+     paper": warm grain texture (same turbulence-filter technique as the
+     app-wide paper grain, tinted toward --bread and boosted in opacity),
+     a dashed "write on the line" note field, and the item list rendered
+     in the handwritten heading font rather than the clean body font. */
+  .order-panel{
+    position: relative; background-color: var(--paper);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.79  0 0 0 0 0.65  0 0 0 0 0.42  0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+    background-size: 220px 220px;
+    border-radius: var(--radius); padding: 20px 18px 18px; margin-top: 14px;
+    box-shadow: 0 3px 12px rgba(139,94,60,0.14); border: 1px solid rgba(201,166,107,0.4);
+  }
+  .order-panel-heading-row{ display:flex; align-items:baseline; justify-content:space-between; gap: 8px; margin-bottom: 14px; }
+  .order-panel h3{ font-size: 22px; margin: 0; }
+  .order-panel-stamp{ font-family:'Patrick Hand',cursive; font-size: 13px; color: var(--mid); transform: rotate(-3deg); flex:none; }
+  .order-note-input{
+    width: 100%; border: none; border-bottom: 2px dashed var(--light); background: transparent;
+    font-family:'Patrick Hand',cursive; font-size: 21px; color: var(--deep); padding: 4px 2px 8px; outline: none;
+  }
+  .order-note-input::placeholder{ color: #B7A98A; font-family:'Patrick Hand',cursive; }
+  .order-note-input:focus{ border-bottom-color: var(--mid); }
 
   .panel-actions{ display:flex; gap: 10px; margin-top: 4px; }
   .cancel-btn{ flex: 1; padding: 13px; border-radius: 12px; border: 1.5px solid var(--light); background: transparent; color: var(--mid); font-weight: 700; font-family:'Quicksand',sans-serif; }
@@ -260,7 +296,7 @@
   }
   .draft-line:last-of-type{ border-bottom: none; }
   .draft-line-info{ flex:1; min-width:0; }
-  .draft-line-name{ font-weight: 700; font-size: 14.5px; color: var(--deep); }
+  .draft-line-name{ font-family:'Patrick Hand',cursive; font-size: 17px; color: var(--deep); }
   .draft-line-custom{ font-size: 11.5px; color: var(--mid); margin-top: 1px; }
   .draft-line-price{ font-weight: 700; font-size: 13.5px; color: var(--deep); flex:none; }
   .draft-line-edit, .draft-line-remove{
@@ -327,31 +363,56 @@
 
   /* ---------- Inventory page ---------- */
   .inv-grid{ display:flex; flex-direction: column; gap: 14px; margin-top: 6px; }
-  .inv-card{ background: var(--paper); border-radius: var(--radius); padding: 18px; display:flex; align-items:center; gap: 16px; box-shadow: var(--shadow); }
-  .inv-icon-wrap{ position: relative; width: 72px; height: 72px; flex: none; }
-  .inv-badge{
-    position: absolute; top: -8px; right: -10px; min-width: 30px; height: 26px; padding: 0 6px;
-    border-radius: 13px; background: var(--deep); color: var(--cream); font-family:'Quicksand',sans-serif;
-    font-weight: 700; font-size: 14px; display:flex; align-items:center; justify-content:center;
-    box-shadow: 0 2px 6px rgba(69,88,38,0.25);
+  .inv-card{ background: var(--paper); border-radius: var(--radius); padding: 16px 18px; display:flex; align-items:center; gap: 16px; box-shadow: var(--shadow); }
+  .inv-icon-wrap{ width: 64px; height: 64px; flex: none; transition: transform 0.25s ease; }
+  .inv-name-row{ display:flex; align-items:center; gap: 8px; min-width: 0; }
+  .inv-name{ font-family:'Patrick Hand',cursive; font-weight: 400; font-size: 19px; color: var(--deep); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .inv-progress-track{
+    width: 100%; height: 10px; background: var(--cream); border: 1.5px solid var(--pale);
+    border-radius: 999px; overflow: hidden; margin-top: 9px;
   }
-  .inv-badge.low{ background: #C98A2B; }
-  .inv-badge.out{ background: var(--danger); }
-  .inv-name-row{ display:flex; align-items:center; gap: 8px; }
-  .inv-name{ font-family:'Patrick Hand',cursive; font-weight: 400; font-size: 20px; color: var(--deep); }
-  .inv-sub{ font-size: 12.5px; color: var(--mid); margin-top: 3px; }
+  .inv-progress-fill{ height: 100%; background: var(--sage); border-radius: 999px; transition: width 0.35s ease, background-color 0.3s ease; }
+  .inv-progress-fill.low{ background: var(--danger-light); }
+  .inv-progress-fill.out{ background: var(--danger); }
+  .inv-count{ font-size: 12.5px; color: var(--mid); font-weight: 700; margin-top: 6px; display:block; }
+  .inv-count.low{ color: var(--danger-light); }
+  .inv-count.out{ color: var(--danger); }
+
+  /* ---------- Live event summary ("postcard") ---------- */
+  .postcard{
+    position: relative; background-color: var(--paper);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.79  0 0 0 0 0.65  0 0 0 0 0.42  0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+    background-size: 220px 220px;
+    border-radius: var(--radius); padding: 22px 20px; margin-top: 6px;
+    box-shadow: 0 3px 12px rgba(139,94,60,0.14); border: 1px solid rgba(201,166,107,0.4);
+  }
+  .postcard-stamp{ position:absolute; top: 16px; right: 18px; font-size: 26px; transform: rotate(9deg); opacity: 0.85; }
+  .postcard-stats-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 18px 12px; padding-right: 30px; }
+  .postcard-stat{ display:flex; flex-direction:column; gap: 2px; }
+  .postcard-stat-label{ font-size: 11px; text-transform:uppercase; letter-spacing: 0.05em; color: var(--mid); font-weight: 700; font-family:'Quicksand',sans-serif; }
+  .postcard-stat-value{ font-family:'Patrick Hand',cursive; font-size: 26px; color: var(--deep); line-height: 1.1; }
+  .postcard-divider{ border-top: 1.5px dashed var(--light); margin: 18px 0; }
+  .postcard-section-title{ font-size: 12px; text-transform:uppercase; letter-spacing: 0.05em; color: var(--mid); font-weight: 700; margin-bottom: 10px; font-family:'Quicksand',sans-serif; }
+  .postcard-list{ display:flex; flex-direction:column; gap: 8px; }
+  .postcard-list-row{ display:flex; justify-content:space-between; gap: 10px; font-family:'Patrick Hand',cursive; font-size: 17px; color: var(--deep); }
+  .postcard-empty{ font-size: 13px; color: var(--mid); font-family:'Quicksand',sans-serif; }
 
   /* ---------- Bottom nav (translucent) ---------- */
   .bottom-nav{
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px; background: rgba(251,250,245,0.72);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border-top: 1.5px solid rgba(221,227,186,0.8); display:flex;
-    box-shadow: 0 -3px 14px rgba(69,88,38,0.10); z-index: 6;
+    width: 100%; max-width: 480px; background: rgba(251,250,245,0.48);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-top: 1.5px solid rgba(221,227,186,0.55); display:flex;
+    box-shadow: 0 -3px 14px rgba(69,88,38,0.08); z-index: 6;
   }
-  .nav-btn{ flex: 1; border: none; background: none; padding: 12px 0 10px; display:flex; flex-direction:column; align-items:center; gap: 4px; color: var(--mid); font-weight: 700; font-size: 11.5px; font-family:'Quicksand',sans-serif; }
+  .nav-btn{ flex: 1; border: none; background: none; padding: 9px 0 10px; display:flex; flex-direction:column; align-items:center; gap: 3px; color: var(--mid); font-weight: 700; font-size: 11.5px; font-family:'Quicksand',sans-serif; }
   .nav-btn.active{ color: var(--deep); }
-  .nav-btn .nav-icon{ font-size: 20px; }
+  .nav-icon-pill{
+    display:flex; align-items:center; justify-content:center;
+    width: 42px; height: 28px; border-radius: 999px; transition: background-color 0.2s ease, transform 0.2s ease;
+  }
+  .nav-btn.active .nav-icon-pill{ background: var(--pale); transform: scale(1.04); }
+  .nav-btn .nav-icon{ font-size: 19px; line-height: 1; }
 
   /* ---------- Settings / modals ---------- */
   .modal-overlay{ position: fixed; inset: 0; background: rgba(69,88,38,0.35); display:flex; align-items:flex-end; justify-content:center; z-index: 20; }
@@ -370,6 +431,39 @@
   .summary-header h1{ color: var(--cream); font-size: 26px; }
   .summary-header .event-datetime{ color: var(--pale); }
   .readonly-note{ font-size: 12px; color: var(--mid); text-align:center; margin: 14px 0 4px; }
+
+  .export-pdf-btn{
+    width: 100%; padding: 13px; border-radius: 12px; border: 1.5px solid var(--sage);
+    background: var(--pale); color: var(--deep); font-weight: 700; font-size: 14.5px;
+    margin-bottom: 16px; font-family:'Quicksand',sans-serif;
+  }
+
+  /* ---------- Receipt (ended-event summary) ---------- */
+  .receipt{
+    position: relative; background-color: var(--paper);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.79  0 0 0 0 0.65  0 0 0 0 0.42  0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+    background-size: 220px 220px;
+    border-radius: var(--radius); padding: 22px 20px 20px; margin: 6px 0 24px;
+    box-shadow: 0 3px 12px rgba(139,94,60,0.14); border: 1px solid rgba(201,166,107,0.4);
+  }
+  .receipt-header{ text-align:center; }
+  .receipt-eyebrow{ font-size: 11px; text-transform:uppercase; letter-spacing: 0.08em; color: var(--mid); font-weight: 700; font-family:'Quicksand',sans-serif; }
+  .receipt-title{ font-family:'Patrick Hand',cursive; font-size: 26px; color: var(--deep); margin: 2px 0; }
+  .receipt-date{ font-size: 12px; color: var(--mid); font-family:'Quicksand',sans-serif; }
+  .receipt-divider{ border-top: 1.5px dashed var(--light); margin: 14px 0; }
+  .receipt-lines{ display:flex; flex-direction:column; gap: 7px; }
+  .receipt-line{ display:flex; align-items:baseline; gap: 6px; font-size: 14.5px; color: var(--deep); font-family:'Quicksand',sans-serif; }
+  .receipt-dots{ flex:1; border-bottom: 1px dotted var(--light); margin: 0 4px; transform: translateY(-3px); }
+  .receipt-total-row{ display:flex; align-items:baseline; gap: 6px; font-weight: 700; font-size: 16px; color: var(--deep); font-family:'Quicksand',sans-serif; }
+  .receipt-meta-row{ display:flex; justify-content:space-between; gap: 10px; font-size: 12px; color: var(--mid); margin-top: 10px; font-family:'Quicksand',sans-serif; }
+  .receipt-footer{ display:flex; flex-direction:column; align-items:center; gap: 8px; margin-top: 20px; }
+  .receipt-thanks{ font-family:'Patrick Hand',cursive; font-size: 15px; color: var(--mid); }
+
+  @media print{
+    .no-print{ display:none !important; }
+    body, #app, #summary-view{ background: white !important; min-height: 0 !important; padding-bottom: 0 !important; }
+    .receipt{ box-shadow:none; border: 1px solid #ccc; background-image:none; }
+  }
 
   /* ---------- Burst / sparkle animation ---------- */
   .burst-particle{

@@ -59,7 +59,7 @@ export default function OrdersPage() {
   return (
     <div id="page-orders" className="page">
       <div className="page-heading-row">
-        <h2 className="page-heading tape-heading">Orders</h2>
+        <h2 className="page-heading">Orders</h2>
         <span className="order-count-pill">
           {pending.length} pending · {completed.length} done
         </span>

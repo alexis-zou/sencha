@@ -6,6 +6,37 @@ A running log of consequential decisions, why they were made, and what would tri
 
 ## Product decisions
 
+### Inventory badge replaced by a progress bar with an absolute (not percentage) low-stock threshold (V8)
+**Decision:** `badgeClass()` changed from `left <= max(2, start * 0.15)` ("low" at ≤15% of starting stock) to a flat `left < 10`. The floating numeric badge overlaying the icon was also replaced by an actual progress-bar element (`.inv-progress-track`/`.inv-progress-fill`) that fills from green and turns a new, softer `--danger-light` red once low.
+**Why:** Explicit user spec ("turns light red when stock is running low <10 remaining"). An absolute threshold is also arguably more useful in practice than a percentage one: 15% of a 200-cup starting stock is 30 cups (plenty of runway), while 15% of a 10-cup stock is ~1.5 (already critical) — a flat "single digits left" cue reads the same regardless of how big the starting batch was.
+**Consequence:** `badgeClass()`'s signature dropped its `start` parameter (no longer needed). `--danger-light` (`#D99C8C`) was added to the palette as a lighter tint of the existing `--danger`, following `DESIGN.md`'s "extend the existing family, don't introduce an arbitrary new hue" rule.
+
+### Ice removed as a drink customization (V8)
+**Decision:** `ICE_OPTIONS`, `OrderLineItem.ice`, and the Ice `<select>` in `ItemPickerModal` were deleted outright, not just hidden.
+**Why:** Explicit user request, no stated reason given — treated as a genuine scope cut, not a temporary hide, since the aesthetic direction for this pass (handwritten order sheet, "correspondence/postcard" feel) leaned toward a shorter, more personal customization flow (Syrup + Milk only).
+**Revisit when:** if a future stand specifically needs to track ice preference (e.g. selling in a climate where "no ice" is a common, meaningful request), this would need to be re-added as a full round-trip (type, constant, UI, `customBitsFor`), not just un-hidden — there's no dormant flag left behind.
+
+### Live "Event Summary" tab is per-event and completed-orders-only, not cross-event analytics (V8)
+**Decision:** The new `SummaryPage` tab (and `computeEventStats()` powering it) reports on the *single currently active event*, computed only from orders marked `done`. It does not aggregate across multiple events — that's `ROADMAP.md` #16 ("basic analytics/history across events"), a distinct, larger, and still-unbuilt feature.
+**Why:** Matches the explicit ask ("a cute postcard-like interface that lays out how much of each item has been sold... at the end of a pop-up sale") — scoped to one pop-up, consistent with how Income already only counts completed orders (a pending order-in-progress hasn't actually sold yet).
+**Revisit when:** cross-event history (ROADMAP #16) gets built — it should almost certainly reuse `computeEventStats()` per-event and fold the results together, rather than duplicating the aggregation logic.
+
+### PDF export via the browser's native print dialog, not a PDF-generation library (V8)
+**Decision:** `SummaryScreen`'s "Export as PDF" button calls `window.print()` against a dedicated `@media print` stylesheet (hides app chrome, shows just the receipt + inventory), rather than adding `jspdf`/`html2canvas` or similar to generate and download a file directly.
+**Why:** Consistent with this project's standing preference to minimize new dependencies (see "Plain CSS, not Tailwind" below, and the mobile port's identical StyleSheet-over-NativeWind choice) — every modern browser's print-to-PDF is a genuinely one-click "Save as PDF" path from the print dialog, at zero new dependency cost.
+**Consequence:** the export is not a single silent click — the browser's print dialog appears first, requiring one more user action ("Save as PDF" / "Print"), and print-CSS quirks are a different debugging surface than a JS-driven canvas export.
+**Revisit when:** if a genuinely one-click, dialog-free download becomes an explicit requirement (e.g. bulk-exporting many events at once), that's the point to reconsider a library-based approach — don't add one preemptively.
+
+### Barcode on the ended-event receipt is decorative, not a real scannable symbology (V8)
+**Decision:** `icons/Barcode.tsx` draws bars using a simple deterministic hash of the event's `id` as a seed — it renders consistently for the same event, but doesn't encode retrievable data and isn't a real barcode format (Code128, EAN, etc.).
+**Why:** The reference mood (vintage evidence tags, a stylized shop receipt) called for a barcode as a *visual* cue that "this is a real receipt," not an actual scan-to-retrieve feature — no such lookup flow was requested or exists.
+**Revisit when:** if a real "scan this to pull up the event" use case ever comes up, this needs to become a genuine encoding (e.g. of the event id) via a real barcode/QR library — the current implementation would need to be replaced outright, not extended.
+
+### Washi-tape heading accent replaced by per-screen gradients; one paper-texture recipe reused across 3 surfaces (V8)
+**Decision:** `.tape-heading` (the rotated sage rectangle behind major headings) was removed everywhere. Each top-level screen now has its own `linear-gradient(cream → pale)` background. Separately, a warmer/more visible variant of the app's existing paper-grain SVG texture (same turbulence-filter technique, tinted toward `--bread`, higher opacity) was applied to three distinct "paper surface" components: the order sheet (`OrderPanel`), the live summary postcard (`SummaryPage`), and the ended-event receipt (`SummaryScreen`).
+**Why:** Explicit user direction toward a "down-to-earth... correspondence/postcard from Japan/teabag" feel, and that flat screens shouldn't visually blend into the app's default background. Reusing one texture recipe (rather than three bespoke ones) keeps the three "paper" surfaces reading as a deliberate family rather than three unrelated decorative choices.
+**Revisit when:** if a fourth "paper surface" is added later, pull the shared `background-image` data-URI into one CSS custom property instead of copy-pasting the same SVG string a fourth time.
+
 ### Inventory generalized to per-menu-item, not a fixed matcha/bread/cookie trio (V7)
 **Decision:** `PopupEvent.inventory` changed from a hardcoded `{ matcha, bread, cookie }` shape to `Record<string, number>` keyed by `MenuItem.id`. Every drink and additional item defined at setup gets its own tracked stock count; there is no longer a fixed set of trackable categories.
 **Why:** The original 3-category model (`ROADMAP.md`'s long-deferred "support more than 3 inventory categories," open since V2) was a real limitation — a stand selling a fourth product type had nowhere to track it. Generalizing was also a prerequisite for the Setup-wizard redesign requested for V7: page 3 ("Starting inventory") needed to list *whatever* the person just defined on page 2, not a fixed trio.

@@ -91,40 +91,48 @@ Setup is a **3-page wizard** (`components/SetupScreen.tsx`), navigated only via 
 
 ### Orders (per active event)
 - **Multi-item orders**: one order can contain any combination of drinks/additional items, each with its own quantity.
-- **Drink customization**: any item of type `drink` prompts for **Syrup** and **Milk** (both from the event's configured, individually-priced lists, plus a free "None"/"No Milk" default) and **Ice** (fixed, unpriced list) when added to an order. A syrup/milk upcharge adds to that line's unit price.
+- **Drink customization**: any item of type `drink` prompts for **Syrup** and **Milk** (both from the event's configured, individually-priced lists, plus a free "None"/"No Milk" default) when added to an order. A syrup/milk upcharge adds to that line's unit price. (Ice was removed as a customization option — see `DECISIONS.md`.)
 - **Add Item flow**: a modal lists the full saved menu; picking an item reveals its configuration (if a drink) + a quantity stepper; confirming adds it as a line to the order being built.
 - **Editing orders after the fact**: tapping an existing order (or its ✎ button) reopens the same panel pre-filled, letting you add/remove/edit line items and the note, then "Save changes."
+- **Order sheet aesthetic**: the "+ Add order" panel (`OrderPanel.tsx`) is styled to feel like jotting an order down by hand — warm kraft-paper grain background, a dashed "write on the line" note field, item names set in the handwritten heading font, a small rotated "✎ jot it down" stamp.
 - **Order note/name** field sits above the item list (not below), used as the ticket's header.
-- **Live low-stock warning**: as items are added/edited in the order panel, an inline banner names exactly which category is short and by how much, computed against real remaining stock (correctly excluding the order being edited from its own "already used" count).
+- **Live low-stock warning**: as items are added/edited in the order panel, an inline banner names exactly which item is short and by how much, computed against real remaining stock (correctly excluding the order being edited from its own "already used" count).
 - **Soft-block confirmation**: submitting an order that would exceed remaining stock shows a confirm dialog repeating the shortage, letting the person proceed anyway or go back.
-- **Ticket/receipt-style order cards**: scalloped top/bottom edges (CSS, no images), neutral paper background, dotted-leader line items (name ... price), a checkable circle, edit/delete actions.
+- **Ticket/receipt-style order cards**: scalloped top/bottom edges (CSS, no images), neutral paper background, dotted-leader line items (name ... price), a checkable circle, edit/delete actions. Line-item names render in the handwritten font too, matching the order sheet.
 - Orders split into **Incomplete** / **Completed** sections; a page-level pill shows "N pending · N done" beside the "Orders" heading.
-- **Completion animation**: checking an order off triggers a brief scale-pulse on the card plus a small emoji "burst" (✅ 🍃 ✨) from the checkbox.
+- **Completion animation**: checking an order off triggers a brief scale-pulse on the card plus a small emoji "burst" (✅ 🍵 🍃 ✨) from the checkbox.
 - **Sparkle animation**: confirming a new/edited order (the "Add to list" / "Save changes" button) triggers a sparkle burst (✨ ⭐ 🌟).
 - Deleting an order (🗑) removes it immediately (no confirmation currently — see § 12 known gaps).
 
 ### Inventory
 - Dedicated Inventory tab (bottom nav) showing **one card per menu item** (drinks + additional items — generalized from the old fixed matcha/bread/cookie trio, so a stand can track any number/kind of products).
-- Each card shows a **live-depleting icon** (`components/icons/StockIcon.tsx`, a generic fill-level cup — green for drinks, tan for items) whose fill fraction drops as that specific item is ordered.
-- A numeric badge overlays each icon showing exact remaining count (clamped to 0, never shows a negative number even when an item has been oversold past its starting stock); badge turns amber ("low," ≤15% of starting stock or ≤2, whichever is greater) or red ("out," ≤0).
+- Each card shows a **cute, type-specific depleting icon**: drinks get `icons/MatchaDrinkIcon.tsx` (a matcha cup with a straw, a small cute face, and a liquid level that drops as stock is ordered); additional items get `icons/CookieIcon.tsx` (a chip-studded cookie with a cute face and a growing "bite" cut-out). Both replaced the earlier generic, type-agnostic `StockIcon`.
+- Remaining stock is shown as a **progress bar** (not a floating numeric badge): a track that fills from `--sage` green and turns `--danger-light` (soft red) once remaining stock drops **below 10** — an absolute threshold, not a percentage of starting stock (see `DECISIONS.md`). A "N left in stock" label sits below the bar in the same color.
 - Remaining = starting count for that item − sum of quantities of that item ordered, across **all** orders (pending + completed) for that event, so the stand doesn't overcommit.
 
 ### Income
-- Labeled "Income" (not "Profit") everywhere it appears — top bar of an active event, home-screen event cards, and the read-only event summary.
-- Income = sum of (price × qty) across all line items in orders marked **done**. Pending orders don't count yet.
+- Labeled "Income" (not "Profit") everywhere it appears — top bar of an active event, home-screen folders, the live Summary tab, and the receipt-style ended-event summary.
+- Income = sum of (price × qty, including any syrup/milk upcharge) across all line items in orders marked **done**. Pending orders don't count yet.
 - No ingredient-cost input yet — this is gross revenue from completed orders, not true profit margin (see `ROADMAP.md`).
 
+### Live Event Summary (while an event is active)
+- Third bottom-nav tab (`SummaryPage.tsx`, alongside Orders/Inventory) styled as a **postcard** — kraft-paper card, a stamp-like emoji in the corner, a 2×2 stat grid (Income, Orders, Avg. order, Pending), a dashed divider, a **Top sellers** list (items sold by quantity, completed orders only), and **Crowd favorites** (most-ordered syrup/milk, if any were used).
+- All figures come from `lib/calculations.ts`'s `computeEventStats()`, which aggregates completed orders only — consistent with how Income is already calculated, so a pending order-in-progress doesn't inflate "what actually sold" figures.
+
 ### Settings & lifecycle
-- ⚙ Settings modal (from the active event's top bar) lets you edit event name, date/time, and starting inventory counts after the fact.
+- ⚙ Settings modal (from the active event's top bar) lets you edit event name, date/time, and starting inventory counts (one row per menu item) after the fact.
 - "End Event" (red button, top bar) confirms, marks the event `ended`, and returns to Home.
-- Ended events become **read-only**: a dedicated Summary screen shows final income, order count, final inventory (via the same depleting icons), and every order as a non-interactive ticket (no add/edit/delete/checkbox).
+- Ended events become **read-only**: a dedicated Summary screen (`SummaryScreen.tsx`) presents the event as a **receipt** — itemized line items with dotted leaders, a total, order-completion counts, top syrup/milk, a decorative barcode (`icons/Barcode.tsx`, deterministic per event id, not a real scannable symbology), final inventory (via the same cute icons/progress bars), and every order as a non-interactive ticket below. An **"🖨️ Export as PDF"** button triggers the browser's native print dialog against a dedicated print stylesheet that hides app chrome and shows just the receipt + inventory — "Save as PDF" from that dialog is the export path (no PDF-generation library was added; see `DECISIONS.md`).
+
+### Home screen — event archive
+- Each saved event renders as a **file folder** (`event-folder` — a small tab shape peeking above a rounded card) rather than a plain list card. Ended events show a "Tap to view receipt →" hint, since opening one retrieves the receipt-style summary above.
 
 ### Visual design
-- Matcha-green earthy palette (see `DESIGN.md` for exact tokens).
+- Matcha-green earthy palette (see `DESIGN.md` for exact tokens), extended with `--danger-light` (a soft pink-red tint of `--danger`) for the "low stock" progress-bar state.
 - Handwritten heading font (Patrick Hand) + clean rounded body font (Quicksand).
-- Subtle paper-grain texture overlay on the whole app background.
-- "Washi tape" accent behind major screen headings.
-- Translucent, blurred bottom navigation bar.
+- Subtle paper-grain texture overlay on the whole app background, plus a warmer, more visible kraft-paper grain (same turbulence-filter technique, tinted and boosted) on the three "paper surface" components: the order sheet, the live summary postcard, and the receipt.
+- Each top-level screen has its own soft matcha gradient background (cream → pale) rather than sitting flush against the app's flat background color. The washi-tape heading accent was removed in favor of this.
+- Translucent, blurred bottom navigation bar with a clearer active-tab indicator (a pale pill behind the active tab's icon).
 - Sign-out as a pill-shaped button with a small icon rather than a bare icon tile.
 
 ---
@@ -255,16 +263,19 @@ All components are under `components/` (one file per component, PascalCase). Qui
 | `AuthScreen` | Sign in / sign up form |
 | `HomeScreen` | Event list + "New pop-up event" entry point |
 | `SetupScreen` | 3-page new-event wizard (details → menu → inventory), button/dot navigation only, no swipe |
-| `MainScreen` | Active event shell: top bar (income, settings, end event), bottom nav, hosts Orders/Inventory pages |
+| `MainScreen` | Active event shell: top bar (income, settings, end event), bottom nav (Orders/Inventory/Summary), hosts the three tab pages |
 | `OrdersPage` | Add-order button, incomplete/completed lists, order count pill |
-| `InventoryPage` | One depleting-icon card per menu item (drink or additional item) + badge |
-| `SummaryScreen` | Read-only view for an ended event |
-| `OrderPanel` | New/edit order form: note field, draft item list, "+ Add item," stock warning, confirm |
-| `ItemPickerModal` | Modal for choosing a menu item + configuring syrup/milk/ice + quantity |
+| `InventoryPage` | One depleting-icon + progress-bar card per menu item (drink or additional item) |
+| `SummaryPage` | Live, in-progress "postcard" tab — income/orders/avg/pending stats, top sellers, favorite syrup/milk |
+| `SummaryScreen` | Read-only, receipt-styled view for an ended event, with a barcode and a PDF export button |
+| `OrderPanel` | New/edit order form styled as a handwritten order sheet: note field, draft item list, "+ Add item," stock warning, confirm |
+| `ItemPickerModal` | Modal for choosing a menu item + configuring syrup/milk + quantity |
 | `TicketCard` | The receipt-style order card, used in both `OrdersPage` and `SummaryScreen` (via a `readonly` prop) |
 | `SettingsModal` | Edit event name/date/inventory after setup |
 | `Burst` | Imperative sparkle/confetti particle effect (not a rendered component — a DOM utility function) |
-| `icons/StockIcon` | Generic SVG cup with a liquid fill that rises/falls with stock fraction, tinted per item type; used for every menu item (replaced the old fixed `MatchaIcon`/`BiteIcon` pair, which only made sense for a hardcoded matcha/bread/cookie trio) |
+| `icons/MatchaDrinkIcon` | Cute matcha cup (straw, face, liquid level) for menu items of type `drink` |
+| `icons/CookieIcon` | Cute chip cookie (face, growing bite mark) for menu items of type `item` |
+| `icons/Barcode` | Decorative barcode, deterministic bars from a seed string (the event id) — not a real scannable symbology |
 
 ---
 
@@ -277,7 +288,8 @@ All pure calculation logic lives in `lib/calculations.ts` (no side effects, full
 - `lineTotal(lineItem)` — `(price + syrupPrice + milkPrice) × qty` for one order line — the combined per-line total including any drink customization upcharges.
 - `totalProfit(event)` — sums `lineTotal` across all line items in orders where `done === true`. (Named `totalProfit` in code for continuity with the prototype; displayed to the user as "Income.")
 - `orderTotal(order)` — sums `lineTotal` across one order's line items.
-- `badgeClass(left, start)` — returns `'out'` at ≤0, `'low'` at ≤15% of starting (minimum 2), else `''`.
+- `badgeClass(left)` — returns `'out'` at ≤0, `'low'` at <10 remaining (an absolute threshold, not a percentage of starting stock — see `DECISIONS.md`), else `''`. Drives both the inventory progress-bar color and its text label.
+- `computeEventStats(event)` — aggregates *completed* orders into: income, total/completed/pending order counts, average order value, items sold (qty + $ subtotal per item, sorted by qty), and the most-ordered syrup/milk. Powers both the live `SummaryPage` tab and the ended-event receipt.
 - `formatMoney`, `formatEventDate`, `formatTimeRange`, `formatEventDateTime` (combines the two), `customBitsFor` — display formatting helpers.
 
 **Key business rule:** inventory is decremented by *all* orders (pending + completed), not just completed ones — an order still being made already "used" that stock, even before it's checked off.

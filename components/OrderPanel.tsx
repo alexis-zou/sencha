@@ -78,12 +78,15 @@ export default function OrderPanel({
 
   return (
     <div className="order-panel">
-      <h3>{editingOrder ? 'Edit order' : 'New order'}</h3>
+      <div className="order-panel-heading-row">
+        <h3>{editingOrder ? 'Edit order' : 'New order'}</h3>
+        <span className="order-panel-stamp">✎ jot it down</span>
+      </div>
 
       <div className="field-group">
         <label className="field-label">Name / table</label>
         <input
-          className="text-input"
+          className="order-note-input"
           type="text"
           placeholder="e.g. Sarah, Table 4"
           value={note}

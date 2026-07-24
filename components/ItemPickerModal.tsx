@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { FlavorOption, MenuItem, OrderLineItem } from '@/lib/types';
-import { ICE_OPTIONS } from '@/lib/constants';
 import { formatMoney } from '@/lib/calculations';
 
 const NONE_SYRUP: FlavorOption = { id: 'none', name: 'None', price: 0 };
@@ -29,7 +28,6 @@ export default function ItemPickerModal({
   const [qty, setQty] = useState<number>(prefill ? prefill.qty : 1);
   const [syrupId, setSyrupId] = useState<string>(prefill?.syrupId || 'none');
   const [milkId, setMilkId] = useState<string>(prefill?.milkId || 'none');
-  const [ice, setIce] = useState<string>(prefill?.ice || ICE_OPTIONS[0]);
 
   const selectedItem = menu.find((m) => m.id === selectedItemId) || null;
   const isDrink = selectedItem?.type === 'drink';
@@ -57,7 +55,6 @@ export default function ItemPickerModal({
       line.milkId = milk.id;
       line.milkName = milk.name;
       line.milkPrice = milk.price;
-      line.ice = ice;
     }
     onConfirm(line);
   }
@@ -104,16 +101,6 @@ export default function ItemPickerModal({
                     {milkOptions.map((m) => (
                       <option key={m.id} value={m.id}>
                         {optionLabel(m)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field-group">
-                  <label className="field-label">Ice</label>
-                  <select className="select-input" value={ice} onChange={(e) => setIce(e.target.value)}>
-                    {ICE_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
                       </option>
                     ))}
                   </select>

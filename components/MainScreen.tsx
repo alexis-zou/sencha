@@ -5,6 +5,7 @@ import { useAppState } from '@/context/AppStateContext';
 import { totalProfit, formatEventDateTime, formatMoney } from '@/lib/calculations';
 import OrdersPage from './OrdersPage';
 import InventoryPage from './InventoryPage';
+import SummaryPage from './SummaryPage';
 import SettingsModal from './SettingsModal';
 
 export default function MainScreen() {
@@ -46,7 +47,7 @@ export default function MainScreen() {
       </div>
 
       <div className="content">
-        {activePage === 'orders' ? <OrdersPage /> : <InventoryPage />}
+        {activePage === 'orders' ? <OrdersPage /> : activePage === 'inventory' ? <InventoryPage /> : <SummaryPage />}
       </div>
 
       <div className="bottom-nav">
@@ -54,15 +55,22 @@ export default function MainScreen() {
           className={'nav-btn' + (activePage === 'orders' ? ' active' : '')}
           onClick={() => setActivePage('orders')}
         >
-          <span className="nav-icon">📋</span>
+          <span className="nav-icon-pill"><span className="nav-icon">📋</span></span>
           Orders
         </button>
         <button
           className={'nav-btn' + (activePage === 'inventory' ? ' active' : '')}
           onClick={() => setActivePage('inventory')}
         >
-          <span className="nav-icon">🍵</span>
+          <span className="nav-icon-pill"><span className="nav-icon">🍵</span></span>
           Inventory
+        </button>
+        <button
+          className={'nav-btn' + (activePage === 'summary' ? ' active' : '')}
+          onClick={() => setActivePage('summary')}
+        >
+          <span className="nav-icon-pill"><span className="nav-icon">📮</span></span>
+          Summary
         </button>
       </div>
 

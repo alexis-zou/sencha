@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useAppState } from '@/context/AppStateContext';
-import SenchaLogo from './icons/SenchaLogo';
 
 export default function AuthScreen() {
   const { authMode, setAuthMode, authError, signIn, signUp } = useAppState();
@@ -21,7 +21,7 @@ export default function AuthScreen() {
 
   return (
     <div id="auth-view" className="auth-wrap">
-      <SenchaLogo size={64} />
+      <Image src="/sencha-icon.png" alt="Sencha" width={64} height={64} priority />
       <h1 className="auth-title">Sencha</h1>
       <p className="auth-sub">Track your pop-up orders, inventory, and income.</p>
 

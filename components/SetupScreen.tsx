@@ -106,6 +106,25 @@ export default function SetupScreen() {
     setTimeout(() => setSavedMsg(''), 2400);
   }
 
+  // Drinks and additional items both require a price (syrup/milk don't) --
+  // a row with a name but no valid price would otherwise be silently
+  // dropped by rowsToMenuItems with no feedback, vanishing from every
+  // later screen (inventory, order picker, summary) with no trace.
+  function findRowMissingPrice(rows: Row[]): string | null {
+    const row = rows.find((r) => r.name.trim() && isNaN(parseFloat(r.price)));
+    return row ? row.name.trim() : null;
+  }
+
+  function handleContinueFromMenu() {
+    const missing = findRowMissingPrice(drinkRows) || findRowMissingPrice(itemRows);
+    if (missing) {
+      setError(`Add a price for "${missing}", or remove it.`);
+      return;
+    }
+    setError('');
+    setPage((p) => p + 1);
+  }
+
   function handleStartSelling() {
     const menu = trackableItems;
     if (menu.length === 0) {
@@ -157,6 +176,7 @@ export default function SetupScreen() {
                 type="number"
                 min={0}
                 step="0.25"
+                placeholder={opts.priceRequired ? 'req.' : 'opt.'}
                 value={row.price}
                 onChange={(e) => updateRow(setter, row.id, { price: e.target.value })}
               />
@@ -340,7 +360,11 @@ export default function SetupScreen() {
 
       <div className="wizard-nav">
         {page < PAGE_COUNT - 1 ? (
-          <button className="confirm-btn" type="button" onClick={() => setPage((p) => p + 1)}>
+          <button
+            className="confirm-btn"
+            type="button"
+            onClick={page === 1 ? handleContinueFromMenu : () => setPage((p) => p + 1)}
+          >
             Continue →
           </button>
         ) : (

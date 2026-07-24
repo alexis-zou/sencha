@@ -293,3 +293,17 @@ A React Native / Expo port of this app has begun as a **separate sibling project
 **Navigation wiring:** `ViewName` gained `'landing'` (new first member). `AppStateContext`'s session-bootstrap effect now resolves to `'landing'` (no saved session) or `'home'` (session found) — previously it was `'auth'` or `'home'`. A new `goToAuth()` action moves from landing into the sign-in/sign-up screen. **Returning signed-in users never see the landing page** — confirmed by reloading an authenticated session and observing it lands directly on Home, not Landing.
 
 **Validation:** `tsc --noEmit` clean; full click-through (landing → Get started → sign up → Home, plus a page-reload check that a returning session skips straight past landing) via the project's headless-browser driver, no console errors.
+
+---
+
+## V9.1 — Real logo image, iOS "Add to Home Screen" icon (2026-07-24)
+
+**Requested changes:** two follow-ups to V9. First, use the *actual* reference PNG for the brand mark instead of the hand-drawn SVG interpretation. Second, set up a proper favicon and `apple-touch-icon` so Safari's "Add to Home Screen" shows the real icon, not a generic browser glyph.
+
+**Real logo image:** the user supplied the source file (`sencha_logo.png`, 1254×1254). Two crops were made with Pillow (installed for this — no image-editing tool existed in the project before): a full lockup (icon + wordmark + tagline) for the landing page, and an icon-only crop for smaller contexts. Both had their flat background color-keyed to transparent (the source background didn't exactly match the app's `--pale`/`--cream` tokens, so leaving it opaque would have shown a faint mismatched rectangle against the app's gradient background). `icons/SenchaLogo.tsx` (the hand-drawn SVG) and the now-unused Cormorant Garamond font import were deleted.
+
+**iOS home screen icon — the transparency gotcha:** iOS renders transparent PNG regions as **solid black** on the home screen, not the surrounding wallpaper — a well-known Apple gotcha, and exactly what the just-added transparent icon would have hit. A **separate, fully opaque** crop was made from the original source (same crop region, alpha channel dropped entirely) specifically for `app/icon.png` (favicon) and the new `app/apple-icon.png` (Next.js's file-based convention for the `apple-touch-icon` link tag — Next auto-generates the correct `<link rel="apple-touch-icon" sizes="...">` from whatever image is placed there, no manual tag needed). Verified the served file has no alpha channel (`PIL: mode RGB`, not `RGBA`) before treating this as done.
+
+**Also added** (natural companions to "make Add to Home Screen use the new icon," not scope creep): `appleWebApp` metadata (`capable: true`, so a home-screen launch opens standalone without Safari's URL bar; explicit `title: 'Sencha'` for the label under the icon) and a `viewport` export with `themeColor: '#455826'` (colors the iOS status bar / Android browser chrome to match the brand). Next.js 14 requires `themeColor` in the `viewport` export, not `metadata` — putting it in `metadata` is deprecated and warns at build time.
+
+**Validation:** fetched the rendered `<head>` directly (`curl`) and confirmed every expected tag — `theme-color`, `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-mobile-web-app-status-bar-style`, `link rel="icon"`, `link rel="apple-touch-icon"` — is present with the right values; fetched `/apple-icon.png` directly and confirmed via Pillow it has no alpha channel. `tsc --noEmit` clean, no console errors.

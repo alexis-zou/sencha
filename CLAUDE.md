@@ -78,7 +78,7 @@ See `lib/types.ts` for the full shape of `PopupEvent`, `Order`, `MenuItem`, etc.
 ## 5. Every Feature Completed
 
 ### Accounts & navigation
-- **Landing page** (`LandingScreen.tsx`) is the first thing a fresh/logged-out visitor sees — brand mark (`icons/SenchaLogo.tsx`), "sencha" wordmark, tagline, and a "Get started" button into sign-in. A **returning signed-in visitor skips it entirely**: `AppStateContext`'s bootstrap effect checks for a saved session before deciding whether the initial view is `'landing'` or straight to `'home'`, so the pitch page never gets in a returning user's way.
+- **Landing page** (`LandingScreen.tsx`) is the first thing a fresh/logged-out visitor sees — the real brand-mark image (`public/sencha-logo.png`, the full icon+wordmark+tagline lockup), a blurb, and a "Get started" button into sign-in. A **returning signed-in visitor skips it entirely**: `AppStateContext`'s bootstrap effect checks for a saved session before deciding whether the initial view is `'landing'` or straight to `'home'`, so the pitch page never gets in a returning user's way.
 - Email/password sign up / sign in (local-only — see § 8 and `DECISIONS.md`).
 - Session persistence (returning to the app skips sign-in until explicit sign-out).
 - Home screen listing all of a user's pop-up events (active + ended), sorted newest-first, each showing income and order count.
@@ -280,7 +280,7 @@ All components are under `components/` (one file per component, PascalCase). Qui
 | `icons/MatchaDrinkIcon` | Cute matcha cup (straw, face, liquid level) for menu items of type `drink` |
 | `icons/CookieIcon` | Cute chip cookie (face, growing bite mark) for menu items of type `item` |
 | `icons/Barcode` | Decorative barcode, deterministic bars from a seed string (the event id) — not a real scannable symbology |
-| `icons/SenchaLogo` | Brand mark — matcha bowl, whisk, cute face, leaf accent — hand-drawn SVG line art, not a raster image (see `DECISIONS.md`) |
+| *(brand mark)* | Not a component — `public/sencha-logo.png` (full lockup, landing page) and `public/sencha-icon.png` (icon-only, auth screen) are real image assets cropped from the user-supplied source PNG. `app/icon.png`/`app/apple-icon.png` are a separately-exported *opaque* crop for the favicon/iOS home-screen icon — see `DECISIONS.md` for why that one can't just reuse the transparent in-app version. |
 
 ---
 

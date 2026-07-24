@@ -1,6 +1,7 @@
 'use client';
 
 import { useAppState } from '@/context/AppStateContext';
+import LandingScreen from './LandingScreen';
 import AuthScreen from './AuthScreen';
 import HomeScreen from './HomeScreen';
 import SetupScreen from './SetupScreen';
@@ -14,6 +15,7 @@ export default function AppShell() {
 
   return (
     <div id="app">
+      {view === 'landing' && <LandingScreen />}
       {view === 'auth' && <AuthScreen />}
       {view === 'home' && <HomeScreen />}
       {view === 'setup' && <SetupScreen />}

@@ -1,12 +1,14 @@
-# CLAUDE.md — Matcha Stand
+# CLAUDE.md — Sencha
 
 This file is the entry point for Claude Code (or any engineer) picking up this project. Read this first, then `DECISIONS.md`, `DESIGN.md`, `CHANGELOG.md`, and `ROADMAP.md` as needed.
+
+*Naming note:* this app was built and documented through V8 under the working title **"Matcha Stand"** — that name still appears throughout the historical `CHANGELOG.md`/`DECISIONS.md` entries and is left as-is there (rewriting history would be inaccurate). As of V9 the public-facing brand is **Sencha**; this file and all new user-facing text use that name going forward.
 
 ---
 
 ## 1. Project Overview
 
-**Matcha Stand** is a mobile-first web app for young entrepreneurs running matcha pop-up stands at farmers markets, school events, and similar one-day pop-ups. It replaces a scramble of notebooks/group chats/mental math with one place to log orders, track remaining stock, and see income — designed to be usable **under time pressure, mid-rush, on a phone**.
+**Sencha** is a mobile-first web app for young entrepreneurs running matcha pop-up stands at farmers markets, school events, and similar one-day pop-ups. It replaces a scramble of notebooks/group chats/mental math with one place to log orders, track remaining stock, and see income — designed to be usable **under time pressure, mid-rush, on a phone**.
 
 The project started as a single-file HTML/CSS/JS prototype (built and iterated live in Claude.ai's artifact environment) and is now being converted into a proper Next.js application, preserving the existing design and UX exactly before any new features are added.
 
@@ -76,6 +78,7 @@ See `lib/types.ts` for the full shape of `PopupEvent`, `Order`, `MenuItem`, etc.
 ## 5. Every Feature Completed
 
 ### Accounts & navigation
+- **Landing page** (`LandingScreen.tsx`) is the first thing a fresh/logged-out visitor sees — brand mark (`icons/SenchaLogo.tsx`), "sencha" wordmark, tagline, and a "Get started" button into sign-in. A **returning signed-in visitor skips it entirely**: `AppStateContext`'s bootstrap effect checks for a saved session before deciding whether the initial view is `'landing'` or straight to `'home'`, so the pitch page never gets in a returning user's way.
 - Email/password sign up / sign in (local-only — see § 8 and `DECISIONS.md`).
 - Session persistence (returning to the app skips sign-in until explicit sign-out).
 - Home screen listing all of a user's pop-up events (active + ended), sorted newest-first, each showing income and order count.
@@ -260,6 +263,7 @@ All components are under `components/` (one file per component, PascalCase). Qui
 | Component | Purpose |
 |---|---|
 | `AppShell` | Top-level view switcher (auth/home/setup/main/summary) based on context `view` |
+| `LandingScreen` | First screen for a logged-out visitor: brand mark, wordmark, tagline, "Get started" CTA into `AuthScreen` |
 | `AuthScreen` | Sign in / sign up form |
 | `HomeScreen` | Event list + "New pop-up event" entry point |
 | `SetupScreen` | 3-page new-event wizard (details → menu → inventory), button/dot navigation only, no swipe |
@@ -276,6 +280,7 @@ All components are under `components/` (one file per component, PascalCase). Qui
 | `icons/MatchaDrinkIcon` | Cute matcha cup (straw, face, liquid level) for menu items of type `drink` |
 | `icons/CookieIcon` | Cute chip cookie (face, growing bite mark) for menu items of type `item` |
 | `icons/Barcode` | Decorative barcode, deterministic bars from a seed string (the event id) — not a real scannable symbology |
+| `icons/SenchaLogo` | Brand mark — matcha bowl, whisk, cute face, leaf accent — hand-drawn SVG line art, not a raster image (see `DECISIONS.md`) |
 
 ---
 

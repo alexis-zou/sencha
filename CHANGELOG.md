@@ -277,3 +277,19 @@ A React Native / Expo port of this app has begun as a **separate sibling project
 - **PDF export**: an "🖨️ Export as PDF" button calls `window.print()`; a new `@media print` block hides everything marked `.no-print` (back link, export button itself, the per-order ticket list) so the printed/saved output is just the receipt + final inventory. No PDF-generation library was added — see `DECISIONS.md` for why, and the tradeoff.
 
 **Validation:** every sub-feature verified via the project's established headless-browser driver approach, including a full regression pass at the end (menu template save/reuse, priced syrup/milk math end-to-end, low-stock warning, Settings modal, live Summary tab math, folder → receipt → PDF-export button, inventory red state) — `tsc --noEmit` clean throughout, no console errors in any flow. `ROADMAP.md` #11 (export/share summary) is now done; #14 (priced syrup add-ons) was actually completed back in V7 but never marked — corrected here.
+
+---
+
+## V9 — Rebrand to "Sencha," new brand mark, landing page (2026-07-23)
+
+**Requested changes:** add a landing page shown when the app opens, and replace the app's small leaf-mark icon with a new logo (a cute matcha bowl + whisk + face + leaf, supplied as a reference image) — "My app name is Sencha."
+
+**Rebrand:** every user-facing "Matcha Stand" string became "Sencha" — the auth screen title, `app/layout.tsx`'s page `<title>`/description, and the receipt's "Matcha Stand" eyebrow line (now "Sencha"). `package.json`'s `name` field updated too. Historical `CHANGELOG.md`/`DECISIONS.md` entries (V1–V8) were **left referring to "Matcha Stand"** deliberately — that was the app's actual name at the time, and rewriting past entries to say "Sencha" would misrepresent the project's own history. `CLAUDE.md`'s title and overview were updated with a naming note explaining the split.
+
+**New brand mark (`icons/SenchaLogo.tsx`):** the reference was a painted/shaded raster illustration (a chawan-style matcha bowl, a chasen whisk, a cute closed-eye smiling face with blush, a leaf accent, and an elegant serif "sencha" wordmark). Rather than embedding that image file directly, it was **recreated as hand-drawn SVG line art** in the same style as every other icon in the app (`MatchaDrinkIcon`, `CookieIcon`, `Barcode`) — see `DECISIONS.md` for why. The existing leaf-mark path (previously standalone on the auth screen) was reused inside the new logo for visual continuity between the old and new marks.
+
+**Landing page (`LandingScreen.tsx`):** new first screen for logged-out visitors — the logo at a larger size, the "sencha" wordmark in a newly-added serif font (Cormorant Garamond, Google Fonts), an uppercase letter-spaced tagline, a small leaf-accented divider, a one-line pitch, and a "Get started" button that hands off to the existing sign-in/sign-up screen. **Scoped narrowly, not a new global font**: Cormorant Garamond is used only for the `.brand-wordmark` class (this page's "sencha" heading) — Patrick Hand remains the one in-app UI heading font, per `DESIGN.md`'s existing "don't introduce a second display font" rule. The wordmark is a logotype, not a UI heading.
+
+**Navigation wiring:** `ViewName` gained `'landing'` (new first member). `AppStateContext`'s session-bootstrap effect now resolves to `'landing'` (no saved session) or `'home'` (session found) — previously it was `'auth'` or `'home'`. A new `goToAuth()` action moves from landing into the sign-in/sign-up screen. **Returning signed-in users never see the landing page** — confirmed by reloading an authenticated session and observing it lands directly on Home, not Landing.
+
+**Validation:** `tsc --noEmit` clean; full click-through (landing → Get started → sign up → Home, plus a page-reload check that a returning session skips straight past landing) via the project's headless-browser driver, no console errors.

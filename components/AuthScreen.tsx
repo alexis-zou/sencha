@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAppState } from '@/context/AppStateContext';
+import SenchaLogo from './icons/SenchaLogo';
 
 export default function AuthScreen() {
   const { authMode, setAuthMode, authError, signIn, signUp } = useAppState();
@@ -20,12 +21,8 @@ export default function AuthScreen() {
 
   return (
     <div id="auth-view" className="auth-wrap">
-      <svg className="leaf-mark" viewBox="0 0 54 54" fill="none">
-        <path d="M27 6C14 10 8 22 12 34c3 9 12 14 18 14 2-14 1-30-3-42Z" fill="#92AA58" />
-        <path d="M27 6c13 4 19 16 15 28-3 9-12 14-18 14C22 34 23 18 27 6Z" fill="#6B7F3A" />
-        <path d="M18 44C17 30 20 16 27 6" stroke="#455826" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-      <h1 className="auth-title">Matcha Stand</h1>
+      <SenchaLogo size={64} />
+      <h1 className="auth-title">Sencha</h1>
       <p className="auth-sub">Track your pop-up orders, inventory, and income.</p>
 
       <div className="auth-tabs">

@@ -6,6 +6,21 @@ A running log of consequential decisions, why they were made, and what would tri
 
 ## Product decisions
 
+### App renamed "Matcha Stand" → "Sencha"; new brand mark recreated as SVG, not embedded as an image file (V9)
+**Decision:** All user-facing product name text became "Sencha." The reference logo the user supplied (a shaded/painted raster illustration of a matcha bowl + whisk + cute face) was **redrawn as hand-coded SVG line art** (`icons/SenchaLogo.tsx`) rather than saved and embedded as an image asset.
+**Why:** This project has zero raster image assets anywhere — every icon (`MatchaDrinkIcon`, `CookieIcon`, `Barcode`, the old leaf-mark) is hand-drawn SVG using the app's own palette variables, so it re-themes for free and stays crisp at any size with no extra network request. Recreating the new logo the same way keeps that pattern intact instead of introducing the app's first exception. Practically, this session also has no mechanism to extract and save the exact pixels of an image pasted into chat as a project file — SVG recreation was the available path, not just the preferred one.
+**Consequence:** the new mark is a faithful *interpretation* of the reference (same composition: bowl, whisk, face, leaf) in the app's existing monoline style, not a pixel-identical reproduction of the shaded/painted original.
+**Revisit when:** if a pixel-exact reproduction of a designed logo file ever matters (e.g. for external marketing use outside this app), that calls for actually importing the source file (Figma/Illustrator export) as a proper asset — a materially different task from "add an icon," and should be scoped as such.
+
+### Landing page shown only to logged-out visitors, gated by the existing session check (V9)
+**Decision:** `ViewName` gained `'landing'` as the new first-run screen, but `AppStateContext`'s bootstrap effect resolves straight to `'home'` (skipping landing) whenever a saved session already exists — the same check that already decided `'auth'` vs `'home'` before this change.
+**Why:** A landing/pitch page is for first impressions; a returning user who's already signed in has already been sold on the app and re-showing marketing copy every time they open it would add friction, working against the app's core "fast, low-friction, under time pressure" principle (`CLAUDE.md` § 2).
+**Revisit when:** if the landing page grows real content worth returning users seeing occasionally (e.g. a changelog/what's-new notice), that should be a deliberate, separate mechanism (a dismissible banner, a version-check) — not by routing signed-in users back through the landing view itself.
+
+### Wordmark serif font scoped to the logo only, not adopted as a second UI font (V9)
+**Decision:** Cormorant Garamond (new Google Fonts import) is applied only to `.brand-wordmark` — the "sencha" logotype on the landing page. Every actual UI heading in the app still uses Patrick Hand.
+**Why:** `DESIGN.md` already has a standing rule against a second display font "for variety." A brand wordmark is conventionally allowed to differ from a product's in-app UI type (most apps' logo font ≠ their body/heading font) — this isn't "variety," it's a distinct logotype, so the existing rule doesn't actually apply to it. Worth stating explicitly so a future pass doesn't either (a) remove the wordmark font thinking it violates the rule, or (b) misread this as license to add more fonts elsewhere.
+
 ### Inventory badge replaced by a progress bar with an absolute (not percentage) low-stock threshold (V8)
 **Decision:** `badgeClass()` changed from `left <= max(2, start * 0.15)` ("low" at ≤15% of starting stock) to a flat `left < 10`. The floating numeric badge overlaying the icon was also replaced by an actual progress-bar element (`.inv-progress-track`/`.inv-progress-fill`) that fills from green and turns a new, softer `--danger-light` red once low.
 **Why:** Explicit user spec ("turns light red when stock is running low <10 remaining"). An absolute threshold is also arguably more useful in practice than a percentage one: 15% of a 200-cup starting stock is 30 cups (plenty of runway), while 15% of a 10-cup stock is ~1.5 (already critical) — a flat "single digits left" cue reads the same regardless of how big the starting batch was.

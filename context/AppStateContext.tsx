@@ -38,6 +38,7 @@ interface AppStateValue {
   summaryEvent: PopupEvent | null;
 
   goHome: () => void;
+  goToAuth: () => void;
   goToSetup: () => void;
   createEvent: (input: NewEventInput) => Promise<void>;
   openEvent: (id: string) => void;
@@ -57,7 +58,7 @@ function normalizeEvents(evs: PopupEvent[]): PopupEvent[] {
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<ViewName>('auth');
+  const [view, setView] = useState<ViewName>('landing');
   const [authMode, setAuthModeState] = useState<AuthMode>('signin');
   const [authError, setAuthError] = useState('');
 
@@ -79,7 +80,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setEvents(normalizeEvents(loadedEvents));
         setView('home');
       } else {
-        setView('auth');
+        setView('landing');
       }
       setLoading(false);
     })();
@@ -152,6 +153,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setActiveEventId(null);
     setSummaryEventId(null);
     setView('home');
+  }
+
+  function goToAuth() {
+    setView('auth');
   }
 
   function goToSetup() {
@@ -248,6 +253,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setActivePage,
     summaryEvent,
     goHome,
+    goToAuth,
     goToSetup,
     createEvent,
     openEvent,

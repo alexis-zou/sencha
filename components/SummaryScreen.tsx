@@ -30,7 +30,7 @@ export default function SummaryScreen() {
 
         <div className="receipt" id="receipt-print-area">
           <div className="receipt-header">
-            <div className="receipt-eyebrow">Matcha Stand</div>
+            <div className="receipt-eyebrow">Sencha</div>
             <h2 className="receipt-title">{summaryEvent.eventName}</h2>
             <div className="receipt-date">{formatEventDateTime(summaryEvent)}</div>
           </div>

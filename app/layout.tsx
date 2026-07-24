@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Matcha Stand',
-  description: 'Track your pop-up orders, inventory, and income.',
+  title: 'Sencha',
+  description: 'Your matcha pop-up hub — track orders, inventory, and income.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

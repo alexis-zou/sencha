@@ -1,4 +1,5 @@
-// Core domain types for Matcha Stand.
+// Core domain types for Sencha (originally built/documented as "Matcha
+// Stand" — renamed for the public-facing brand; see DECISIONS.md).
 
 // 'drink' items prompt for syrup/milk customization when added to an
 // order; 'item' is any other product (food, merch) sold at a flat price.
@@ -71,7 +72,7 @@ export interface MenuTemplate {
   milks: FlavorOption[];
 }
 
-export type ViewName = 'auth' | 'home' | 'setup' | 'main' | 'summary';
+export type ViewName = 'landing' | 'auth' | 'home' | 'setup' | 'main' | 'summary';
 // Tabs inside an active event's MainScreen. Note 'summary' here means the
 // live, in-progress postcard tab (SummaryPage) — distinct from ViewName's
 // 'summary', which is the read-only screen for an *ended* event.

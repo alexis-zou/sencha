@@ -54,22 +54,24 @@ export default function HomeScreen() {
               return (
                 <div key={ev.id} className="event-folder" onClick={() => openEvent(ev.id)}>
                   <span className="event-folder-tab" aria-hidden="true" />
-                  <div className="event-card-top">
-                    <div>
-                      <div className="event-card-name">{ev.eventName}</div>
-                      <div className="event-card-date">{formatEventDateTime(ev) || 'No date set'}</div>
+                  <div className="event-folder-front">
+                    <div className="event-card-top">
+                      <div>
+                        <div className="event-card-name">{ev.eventName}</div>
+                        <div className="event-card-date">{formatEventDateTime(ev) || 'No date set'}</div>
+                      </div>
+                      <div className={'status-badge ' + ev.status}>{ev.status === 'active' ? 'Active' : 'Ended'}</div>
                     </div>
-                    <div className={'status-badge ' + ev.status}>{ev.status === 'active' ? 'Active' : 'Ended'}</div>
+                    <div className="event-card-stats">
+                      <span>
+                        Income <b>{formatMoney(profit)}</b>
+                      </span>
+                      <span>
+                        Orders <b>{ev.orders.length}</b>
+                      </span>
+                    </div>
+                    {ev.status === 'ended' && <div className="event-folder-hint">Tap to view receipt →</div>}
                   </div>
-                  <div className="event-card-stats">
-                    <span>
-                      Income <b>{formatMoney(profit)}</b>
-                    </span>
-                    <span>
-                      Orders <b>{ev.orders.length}</b>
-                    </span>
-                  </div>
-                  {ev.status === 'ended' && <div className="event-folder-hint">Tap to view receipt →</div>}
                 </div>
               );
             })

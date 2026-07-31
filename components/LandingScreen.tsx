@@ -8,7 +8,9 @@ export default function LandingScreen() {
 
   return (
     <div id="landing-view" className="landing-wrap">
-      <Image src="/sencha-logo.png" alt="Sencha — your matcha pop-up hub" width={300} height={300} priority className="brand-logo-full" />
+      <Image src="/sencha-icon.png" alt="Sencha" width={132} height={132} priority className="brand-icon-full" />
+      <h1 className="brand-wordmark">sencha</h1>
+      <p className="brand-tagline">Your matcha pop-up hub</p>
 
       <p className="landing-blurb">
         Track your pop-up orders, inventory, and income — all in one place, built for the rush.

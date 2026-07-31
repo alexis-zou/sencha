@@ -281,32 +281,40 @@ export default function SetupScreen() {
 
           {/* ---------- Page 2: menu ---------- */}
           <div className="wizard-page" ref={page1Ref}>
-            <div className="field-group">
-              <div className="section-title" style={{ margin: '0 0 10px' }}>Drinks</div>
+            <div className="menu-section menu-section-drinks">
+              <div className="menu-section-title">
+                <span className="menu-section-icon">🥤</span> Drinks
+              </div>
               {renderRows(drinkRows, setDrinkRows, { namePlaceholder: 'Item name (e.g. Iced Matcha)', priceRequired: true })}
               <button className="add-row-btn" type="button" onClick={() => addRow(setDrinkRows)}>
                 + Add drink
               </button>
             </div>
 
-            <div className="field-group">
-              <div className="section-title" style={{ margin: '0 0 10px' }}>Syrup</div>
+            <div className="menu-section menu-section-syrup">
+              <div className="menu-section-title">
+                <span className="menu-section-icon">🍯</span> Syrup
+              </div>
               {renderRows(syrupRows, setSyrupRows, { namePlaceholder: 'e.g. Brown Sugar', priceRequired: false })}
               <button className="add-row-btn" type="button" onClick={() => addRow(setSyrupRows)}>
                 + Add syrup option
               </button>
             </div>
 
-            <div className="field-group">
-              <div className="section-title" style={{ margin: '0 0 10px' }}>Milk</div>
+            <div className="menu-section menu-section-milk">
+              <div className="menu-section-title">
+                <span className="menu-section-icon">🥛</span> Milk
+              </div>
               {renderRows(milkRows, setMilkRows, { namePlaceholder: 'e.g. Oat Milk', priceRequired: false })}
               <button className="add-row-btn" type="button" onClick={() => addRow(setMilkRows)}>
                 + Add milk option
               </button>
             </div>
 
-            <div className="field-group">
-              <div className="section-title" style={{ margin: '0 0 10px' }}>Additional items</div>
+            <div className="menu-section menu-section-items">
+              <div className="menu-section-title">
+                <span className="menu-section-icon">🍪</span> Additional items
+              </div>
               {renderRows(itemRows, setItemRows, { namePlaceholder: 'e.g. Salt Bread', priceRequired: true })}
               <button className="add-row-btn" type="button" onClick={() => addRow(setItemRows)}>
                 + Add item

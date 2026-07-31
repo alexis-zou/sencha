@@ -79,6 +79,11 @@ export default function TicketCard({
         )}
       </div>
 
+      <div className="ticket-total-hero">
+        <span className="ticket-total-hero-label">Total</span>
+        <span className="ticket-total-hero-value">{formatMoney(orderTotal(order))}</span>
+      </div>
+
       <div className="ticket-lines">
         {order.items.map((it, idx) => {
           const bits = customBitsFor(it);
@@ -93,12 +98,6 @@ export default function TicketCard({
             </div>
           );
         })}
-      </div>
-
-      <div className="ticket-total-row">
-        <span>Total</span>
-        <span className="ticket-dots" />
-        <span>{formatMoney(orderTotal(order))}</span>
       </div>
     </div>
   );

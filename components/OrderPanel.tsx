@@ -100,33 +100,36 @@ export default function OrderPanel({
             No items yet — tap &quot;+ Add item&quot; below.
           </div>
         ) : (
-          items.map((it, idx) => {
-            const bits = customBitsFor(it);
-            return (
-              <div className="draft-line" key={idx}>
-                <div className="draft-line-info">
-                  <div className="draft-line-name">
-                    {it.qty}× {it.itemName}
+          <div className="draft-lines">
+            {items.map((it, idx) => {
+              const bits = customBitsFor(it);
+              return (
+                <div className="draft-line" key={idx}>
+                  <div className="draft-line-info">
+                    <span className="draft-line-name">
+                      {it.qty}× {it.itemName}
+                      {bits.length > 0 && <span className="draft-line-custom"> ({bits.join(', ')})</span>}
+                    </span>
+                    <span className="draft-line-dots" />
                   </div>
-                  {bits.length > 0 && <div className="draft-line-custom">{bits.join(', ')}</div>}
+                  <div className="draft-line-price">{formatMoney(lineTotal(it))}</div>
+                  <button
+                    className="draft-line-edit"
+                    type="button"
+                    onClick={() => {
+                      setPickerEditIndex(idx);
+                      setPickerOpen(true);
+                    }}
+                  >
+                    ✎
+                  </button>
+                  <button className="draft-line-remove" type="button" onClick={() => handleRemoveLine(idx)}>
+                    ×
+                  </button>
                 </div>
-                <div className="draft-line-price">{formatMoney(lineTotal(it))}</div>
-                <button
-                  className="draft-line-edit"
-                  type="button"
-                  onClick={() => {
-                    setPickerEditIndex(idx);
-                    setPickerOpen(true);
-                  }}
-                >
-                  ✎
-                </button>
-                <button className="draft-line-remove" type="button" onClick={() => handleRemoveLine(idx)}>
-                  ×
-                </button>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 

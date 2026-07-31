@@ -8,7 +8,7 @@ export default function CookieIcon({ fractionEaten, size = 72 }: { fractionEaten
 
   return (
     <svg viewBox="0 0 72 72" width={size} height={size}>
-      <circle cx="36" cy="38" r="22" fill="var(--bread)" stroke="var(--deep)" strokeWidth="2.5" />
+      <circle cx="36" cy="38" r="22" fill="var(--bread)" stroke="var(--deep)" strokeWidth="2.8" />
 
       <circle cx="27" cy="30" r="2.3" fill="var(--cookie)" />
       <circle cx="46" cy="30" r="2" fill="var(--cookie)" />
@@ -16,11 +16,13 @@ export default function CookieIcon({ fractionEaten, size = 72 }: { fractionEaten
       <circle cx="47" cy="46" r="2.4" fill="var(--cookie)" />
 
       {/* cute face */}
-      <circle cx="29" cy="38" r="1.6" fill="var(--deep)" />
-      <circle cx="43" cy="38" r="1.6" fill="var(--deep)" />
-      <path d="M31 43 Q36 46 41 43" fill="none" stroke="var(--deep)" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="26.5" cy="41.5" r="2.4" fill="var(--danger)" opacity="0.26" />
+      <circle cx="45.5" cy="41.5" r="2.4" fill="var(--danger)" opacity="0.26" />
+      <circle cx="29" cy="38" r="1.9" fill="var(--deep)" />
+      <circle cx="43" cy="38" r="1.9" fill="var(--deep)" />
+      <path d="M31 43 Q36 46.5 41 43" fill="none" stroke="var(--deep)" strokeWidth="1.9" strokeLinecap="round" />
 
-      {r > 0 && <circle cx="54" cy="22" r={r} fill="var(--cream)" />}
+      {r > 0 && <circle cx="54" cy="22" r={r} fill="var(--cream)" stroke="var(--deep)" strokeWidth="1.5" />}
     </svg>
   );
 }

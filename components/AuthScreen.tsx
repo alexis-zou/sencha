@@ -22,7 +22,8 @@ export default function AuthScreen() {
   return (
     <div id="auth-view" className="auth-wrap">
       <Image src="/sencha-icon.png" alt="Sencha" width={64} height={64} priority />
-      <h1 className="auth-title">Sencha</h1>
+      <h1 className="brand-wordmark auth-title">sencha</h1>
+      <p className="brand-tagline">Your matcha pop-up hub</p>
       <p className="auth-sub">Track your pop-up orders, inventory, and income.</p>
 
       <div className="auth-tabs">

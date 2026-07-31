@@ -104,3 +104,14 @@ create policy "users manage their own flavor options"
   on public.flavor_options for all
   using (exists (select 1 from public.events where id = flavor_options.event_id and user_id = auth.uid()))
   with check (exists (select 1 from public.events where id = flavor_options.event_id and user_id = auth.uid()));
+
+-- RLS policies only govern *which rows* a role can touch -- Postgres also
+-- requires the role to hold baseline table-level privileges before RLS is
+-- even evaluated. The Supabase Table Editor grants these automatically
+-- when you create a table through the UI; raw SQL via the SQL Editor does
+-- not, and skipping this produces a `42501 permission denied for table`
+-- error even though the RLS policies above are otherwise correct.
+grant select, insert, update, delete on public.events to authenticated;
+grant select, insert, update, delete on public.menu_items to authenticated;
+grant select, insert, update, delete on public.inventory to authenticated;
+grant select, insert, update, delete on public.flavor_options to authenticated;

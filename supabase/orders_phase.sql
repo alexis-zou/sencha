@@ -61,3 +61,12 @@ create policy "users manage their own order items"
   on public.order_items for all
   using (exists (select 1 from public.orders where id = order_items.order_id and user_id = auth.uid()))
   with check (exists (select 1 from public.orders where id = order_items.order_id and user_id = auth.uid()));
+
+-- RLS policies only govern *which rows* a role can touch -- Postgres also
+-- requires the role to hold baseline table-level privileges before RLS is
+-- even evaluated. The Supabase Table Editor grants these automatically
+-- when you create a table through the UI; raw SQL via the SQL Editor does
+-- not, and skipping this produces a `42501 permission denied for table`
+-- error even though the RLS policies above are otherwise correct.
+grant select, insert, update, delete on public.orders to authenticated;
+grant select, insert, update, delete on public.order_items to authenticated;

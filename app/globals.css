@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Quicksand:wght@400;500;600;700&family=Fredoka:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Quicksand:wght@400;500;600;700&family=Cormorant+Garamond:wght@500;600&display=swap');
 
   :root{
     --deep: #455826;
@@ -63,12 +63,15 @@
   .hidden{ display: none !important; }
 
   /* ---------- Brand wordmark: shared "sencha" heading treatment ----------
-     Standardized on Fredoka (bold, rounded, hand-drawn-bubble feel) rather
-     than the in-app Patrick Hand headings or the old baked-in raster
-     wordmark, so the brand name reads identically wherever it appears
-     (landing hero, auth screen) instead of drifting per-screen. */
+     Matched to the original raster logo's actual wordmark: a thin,
+     high-waisted serif (Cormorant Garamond), not a bold rounded display
+     face -- an earlier pass tried Fredoka here for a "cute gamified"
+     feel, but that drifted from what the source artwork actually shows,
+     so this reverts to the serif (same choice V9 originally made for
+     this exact wordmark) scoped only to the brand name, not the rest of
+     the UI's Patrick Hand headings. */
   .brand-wordmark{
-    font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--deep);
+    font-family: 'Cormorant Garamond', serif; font-weight: 600; color: var(--deep);
     letter-spacing: 0.01em; margin: 0; line-height: 1;
   }
   .brand-tagline{
@@ -82,7 +85,7 @@
     padding: 40px 30px; text-align:center;
   }
   .brand-icon-full{ width: 132px; height: 132px; margin-bottom: 14px; }
-  .landing-wrap .brand-wordmark{ font-size: 42px; }
+  .landing-wrap .brand-wordmark{ font-size: 56px; }
   .landing-wrap .brand-tagline{ margin-bottom: 22px; }
   .landing-blurb{
     font-family:'Quicksand',sans-serif; font-size: 14.5px; color: var(--mid); line-height: 1.6;
@@ -93,7 +96,7 @@
   /* ---------- Auth view ---------- */
   .auth-wrap{ padding: 60px 24px 40px; display:flex; flex-direction: column; align-items:center; }
   .auth-wrap img:first-child{ margin-bottom: 10px; }
-  .auth-title{ font-size: 34px; margin-bottom: 2px; }
+  .auth-title{ font-size: 44px; margin-bottom: 2px; }
   .auth-wrap .brand-tagline{ margin-bottom: 4px; }
   .auth-sub{ color: var(--mid); font-size: 14px; margin-bottom: 26px; text-align:center; }
   .auth-form{ width: 100%; }
@@ -418,10 +421,10 @@
   /* ---------- Ticket-style order cards ----------
      Restyled after a thermal-printer receipt reference: a crisp torn/
      perforated edge (sharp zigzag, not a soft scallop), and a prominent
-     bold "Total" headline stat up top before the itemized breakdown —
-     translated into the app's own cute-gamified language (matcha
-     palette, Fredoka for the big number, Patrick Hand for names)
-     rather than copied verbatim in monospace black-and-white. */
+     "Total" headline stat up top before the itemized breakdown —
+     translated into the app's own language (matcha palette, Patrick
+     Hand for the big number, same as every other prominent stat in the
+     app) rather than copied verbatim in monospace black-and-white. */
   .ticket-card{
     position: relative; background: var(--paper); border-radius: 10px; padding: 16px 16px 12px;
     margin: 18px 0 22px; box-shadow: 0 3px 0 rgba(69,88,38,0.06), var(--shadow);
@@ -461,7 +464,7 @@
     font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.09em;
     color: var(--mid); font-family:'Quicksand',sans-serif;
   }
-  .ticket-total-hero-value{ font-family:'Fredoka',sans-serif; font-weight: 700; font-size: 27px; color: var(--deep); line-height: 1; }
+  .ticket-total-hero-value{ font-family:'Patrick Hand',cursive; font-weight: 400; font-size: 30px; color: var(--deep); line-height: 1; }
   .ticket-card.done .ticket-total-hero-value{ color: var(--mid); }
 
   .ticket-lines{ display:flex; flex-direction:column; gap: 1px; }

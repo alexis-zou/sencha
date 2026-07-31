@@ -10,7 +10,9 @@ export default function SettingsModal({
 }: {
   event: PopupEvent;
   onClose: () => void;
-  onSave: (patch: Partial<Pick<PopupEvent, 'eventName' | 'eventDate' | 'startTime' | 'endTime' | 'inventory'>>) => void;
+  onSave: (
+    patch: Partial<Pick<PopupEvent, 'eventName' | 'eventDate' | 'startTime' | 'endTime' | 'inventory'>>
+  ) => Promise<void>;
 }) {
   const [eventName, setEventName] = useState(event.eventName);
   const [eventDate, setEventDate] = useState(event.eventDate || '');
@@ -19,21 +21,30 @@ export default function SettingsModal({
   const [invValues, setInvValues] = useState<Record<string, string>>(
     Object.fromEntries(event.menu.map((m) => [m.id, String(event.inventory[m.id] ?? 0)]))
   );
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  function handleSave() {
+  async function handleSave() {
     const inventory: Record<string, number> = { ...event.inventory };
     event.menu.forEach((m) => {
       const n = parseInt(invValues[m.id], 10);
       if (!isNaN(n) && n >= 0) inventory[m.id] = n;
     });
-    onSave({
-      eventName: eventName.trim() || event.eventName,
-      eventDate,
-      startTime,
-      endTime,
-      inventory,
-    });
-    onClose();
+    setError('');
+    setSaving(true);
+    try {
+      await onSave({
+        eventName: eventName.trim() || event.eventName,
+        eventDate,
+        startTime,
+        endTime,
+        inventory,
+      });
+      onClose();
+    } catch {
+      setError('Could not save your changes — check your connection and try again.');
+      setSaving(false);
+    }
   }
 
   return (
@@ -77,8 +88,9 @@ export default function SettingsModal({
             </div>
           ))}
         </div>
-        <button className="primary-btn" onClick={handleSave}>
-          Save changes
+        {error && <div className="error-text">{error}</div>}
+        <button className="primary-btn" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
     </div>

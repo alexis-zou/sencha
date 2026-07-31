@@ -9,9 +9,15 @@ import {
   setOrderDone as setOrderDoneRemote,
   deleteOrder as deleteOrderRemote,
 } from '@/lib/supabase/orders';
+import {
+  fetchEvents,
+  createEventRemote,
+  updateEventSettingsRemote,
+  endEventRemote,
+  EventSettingsPatch,
+} from '@/lib/supabase/events';
 import { storage } from '@/lib/storage';
-import { eventsKey, menuTemplateKey } from '@/lib/constants';
-import { uid } from '@/lib/id';
+import { menuTemplateKey } from '@/lib/constants';
 import { AuthMode, MainPage, MenuTemplate, Order, OrderLineItem, PopupEvent, ViewName } from '@/lib/types';
 
 export interface NewEventInput {
@@ -52,13 +58,12 @@ interface AppStateValue {
   createEvent: (input: NewEventInput) => Promise<void>;
   openEvent: (id: string) => void;
   endActiveEvent: () => Promise<void>;
-  updateActiveEvent: (updater: (ev: PopupEvent) => PopupEvent) => void;
+  updateEventSettings: (patch: EventSettingsPatch) => Promise<void>;
   saveMenuTemplate: (tpl: MenuTemplate) => Promise<void>;
   loadMenuTemplate: () => Promise<MenuTemplate | null>;
 
   // Orders live in Supabase now (see lib/supabase/orders.ts) -- these are
-  // the only way to mutate an order; updateActiveEvent no longer touches
-  // ev.orders directly (see OrdersPage.tsx).
+  // the only way to mutate an order (see OrdersPage.tsx).
   addOrder: (note: string, items: OrderLineItem[]) => Promise<void>;
   editOrder: (orderId: string, note: string, items: OrderLineItem[]) => Promise<void>;
   toggleOrderDone: (orderId: string) => Promise<void>;
@@ -66,12 +71,6 @@ interface AppStateValue {
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
-
-// Old saved events may predate a field added later — default defensively so
-// older local data never crashes the app.
-function normalizeEvents(evs: PopupEvent[]): PopupEvent[] {
-  return evs.map((e) => ({ ...e, syrups: e.syrups || [], milks: e.milks || [], inventory: e.inventory || {} }));
-}
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -94,12 +93,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
 
   async function loadUserInto(email: string, userId: string) {
-    const evRes = await storage.get(eventsKey(email));
-    const loadedEvents: PopupEvent[] = evRes?.value ? JSON.parse(evRes.value) : [];
     setCurrentUser(email);
     setCurrentUserId(userId);
-    setEvents(normalizeEvents(loadedEvents));
-    const grouped = await fetchOrdersByEvent(supabase, userId);
+    const [loadedEvents, grouped] = await Promise.all([
+      fetchEvents(supabase, userId),
+      fetchOrdersByEvent(supabase, userId),
+    ]);
+    setEvents(loadedEvents);
     setOrdersByEvent(grouped);
     setView((v) => (v === 'setup' || v === 'main' || v === 'summary' ? v : 'home'));
   }
@@ -135,12 +135,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ---- persist events whenever they change (post-login) ----
-  useEffect(() => {
-    if (!currentUser || loading) return;
-    storage.set(eventsKey(currentUser), JSON.stringify(events));
-  }, [events, currentUser, loading]);
 
   function setAuthMode(m: AuthMode) {
     setAuthModeState(m);
@@ -208,21 +202,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }
 
   async function createEvent(input: NewEventInput) {
-    const newEvent: PopupEvent = {
-      id: uid(),
-      eventName: input.eventName,
-      eventDate: input.eventDate,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      inventory: input.inventory,
-      menu: input.menu,
-      syrups: input.syrups,
-      milks: input.milks,
-      orders: [],
-      status: 'active',
-      createdAt: Date.now(),
-      endedAt: null,
-    };
+    if (!currentUserId) return;
+    const newEvent = await createEventRemote(supabase, currentUserId, input);
     setEvents((prev) => [...prev, newEvent]);
     setActiveEventId(newEvent.id);
     setActivePage('orders');
@@ -260,6 +241,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   async function endActiveEvent() {
     if (!activeEventId) return;
+    await endEventRemote(supabase, activeEventId);
     setEvents((prev) =>
       prev.map((e) => (e.id === activeEventId ? { ...e, status: 'ended' as const, endedAt: Date.now() } : e))
     );
@@ -267,9 +249,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setView('home');
   }
 
-  function updateActiveEvent(updater: (ev: PopupEvent) => PopupEvent) {
+  async function updateEventSettings(patch: EventSettingsPatch) {
     if (!activeEventId) return;
-    setEvents((prev) => prev.map((e) => (e.id === activeEventId ? updater(e) : e)));
+    await updateEventSettingsRemote(supabase, activeEventId, patch);
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== activeEventId) return e;
+        const next = { ...e };
+        if (patch.eventName !== undefined) next.eventName = patch.eventName;
+        if (patch.eventDate !== undefined) next.eventDate = patch.eventDate;
+        if (patch.startTime !== undefined) next.startTime = patch.startTime;
+        if (patch.endTime !== undefined) next.endTime = patch.endTime;
+        if (patch.inventory) next.inventory = { ...e.inventory, ...patch.inventory };
+        return next;
+      })
+    );
   }
 
   // Single merge point: every event handed to the rest of the app gets its
@@ -349,7 +343,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     createEvent,
     openEvent,
     endActiveEvent,
-    updateActiveEvent,
+    updateEventSettings,
     saveMenuTemplate,
     loadMenuTemplate,
     addOrder,

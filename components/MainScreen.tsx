@@ -9,7 +9,7 @@ import SummaryPage from './SummaryPage';
 import SettingsModal from './SettingsModal';
 
 export default function MainScreen() {
-  const { activeEvent, activePage, setActivePage, goHome, endActiveEvent, updateActiveEvent } = useAppState();
+  const { activeEvent, activePage, setActivePage, goHome, endActiveEvent, updateEventSettings } = useAppState();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!activeEvent) return null;
@@ -78,7 +78,7 @@ export default function MainScreen() {
         <SettingsModal
           event={activeEvent}
           onClose={() => setSettingsOpen(false)}
-          onSave={(patch) => updateActiveEvent((ev) => ({ ...ev, ...patch }))}
+          onSave={updateEventSettings}
         />
       )}
     </div>

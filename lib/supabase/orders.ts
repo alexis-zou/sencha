@@ -30,22 +30,27 @@ interface OrderItemRow {
   milk_price: number | null;
 }
 
+// Postgres `numeric` columns come back from PostgREST as JSON strings
+// (not numbers) to avoid float precision loss -- every numeric field read
+// off a row must be coerced explicitly, or downstream arithmetic
+// (lineTotal, orderTotal) silently does string concatenation instead of
+// addition.
 function toLineItem(row: OrderItemRow): OrderLineItem {
   const item: OrderLineItem = {
     itemId: row.item_id,
     itemName: row.item_name,
-    price: row.price,
+    price: Number(row.price),
     qty: row.qty,
   };
   if (row.syrup_id) {
     item.syrupId = row.syrup_id;
     item.syrupName = row.syrup_name ?? undefined;
-    item.syrupPrice = row.syrup_price ?? undefined;
+    item.syrupPrice = row.syrup_price != null ? Number(row.syrup_price) : undefined;
   }
   if (row.milk_id) {
     item.milkId = row.milk_id;
     item.milkName = row.milk_name ?? undefined;
-    item.milkPrice = row.milk_price ?? undefined;
+    item.milkPrice = row.milk_price != null ? Number(row.milk_price) : undefined;
   }
   return item;
 }

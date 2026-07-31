@@ -46,6 +46,7 @@ export default function SetupScreen() {
 
   const [invValues, setInvValues] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // Carry a previously-saved menu into this new event as a starting point.
   useEffect(() => {
@@ -125,7 +126,7 @@ export default function SetupScreen() {
     setPage((p) => p + 1);
   }
 
-  function handleStartSelling() {
+  async function handleStartSelling() {
     const menu = trackableItems;
     if (menu.length === 0) {
       setError('Add at least one drink or item with a name and price.');
@@ -145,16 +146,22 @@ export default function SetupScreen() {
       return;
     }
     setError('');
-    createEvent({
-      eventName: eventName.trim() || 'My Stand',
-      eventDate,
-      startTime,
-      endTime,
-      inventory,
-      menu,
-      syrups: rowsToFlavorOptions(syrupRows),
-      milks: rowsToFlavorOptions(milkRows),
-    });
+    setSubmitting(true);
+    try {
+      await createEvent({
+        eventName: eventName.trim() || 'My Stand',
+        eventDate,
+        startTime,
+        endTime,
+        inventory,
+        menu,
+        syrups: rowsToFlavorOptions(syrupRows),
+        milks: rowsToFlavorOptions(milkRows),
+      });
+    } catch {
+      setError('Could not create your stand — check your connection and try again.');
+      setSubmitting(false);
+    }
   }
 
   function renderRows(rows: Row[], setter: React.Dispatch<React.SetStateAction<Row[]>>, opts: { namePlaceholder: string; priceRequired: boolean }) {
@@ -376,8 +383,8 @@ export default function SetupScreen() {
             Continue →
           </button>
         ) : (
-          <button className="confirm-btn" type="button" onClick={handleStartSelling}>
-            Start selling
+          <button className="confirm-btn" type="button" onClick={handleStartSelling} disabled={submitting}>
+            {submitting ? 'Setting up your stand…' : 'Start selling'}
           </button>
         )}
       </div>

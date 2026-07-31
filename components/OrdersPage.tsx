@@ -3,14 +3,14 @@
 import { useState } from 'react';
 import { useAppState } from '@/context/AppStateContext';
 import { Order, OrderLineItem } from '@/lib/types';
-import { uid } from '@/lib/id';
 import TicketCard from './TicketCard';
 import OrderPanel from './OrderPanel';
 
 export default function OrdersPage() {
-  const { activeEvent, updateActiveEvent } = useAppState();
+  const { activeEvent, addOrder, editOrder, toggleOrderDone, deleteOrder } = useAppState();
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [error, setError] = useState('');
 
   if (!activeEvent) return null;
 
@@ -32,28 +32,36 @@ export default function OrdersPage() {
     setEditingOrder(null);
   }
 
-  function handleSaveOrder(note: string, items: OrderLineItem[]) {
-    if (editingOrder) {
-      updateActiveEvent((ev) => ({
-        ...ev,
-        orders: ev.orders.map((o) => (o.id === editingOrder.id ? { ...o, note, items } : o)),
-      }));
-    } else {
-      const newOrder: Order = { id: uid(), items, note, done: false, ts: Date.now() };
-      updateActiveEvent((ev) => ({ ...ev, orders: [...ev.orders, newOrder] }));
+  async function handleSaveOrder(note: string, items: OrderLineItem[]) {
+    try {
+      setError('');
+      if (editingOrder) {
+        await editOrder(editingOrder.id, note, items);
+      } else {
+        await addOrder(note, items);
+      }
+      closePanel();
+    } catch {
+      setError('Could not save that order — check your connection and try again.');
     }
-    closePanel();
   }
 
-  function handleToggleDone(id: string) {
-    updateActiveEvent((ev) => ({
-      ...ev,
-      orders: ev.orders.map((o) => (o.id === id ? { ...o, done: !o.done } : o)),
-    }));
+  async function handleToggleDone(id: string) {
+    try {
+      setError('');
+      await toggleOrderDone(id);
+    } catch {
+      setError('Could not update that order — check your connection and try again.');
+    }
   }
 
-  function handleDelete(id: string) {
-    updateActiveEvent((ev) => ({ ...ev, orders: ev.orders.filter((o) => o.id !== id) }));
+  async function handleDelete(id: string) {
+    try {
+      setError('');
+      await deleteOrder(id);
+    } catch {
+      setError('Could not delete that order — check your connection and try again.');
+    }
   }
 
   return (
@@ -68,6 +76,7 @@ export default function OrdersPage() {
       <button className="add-btn" onClick={openNewOrder}>
         + Add order
       </button>
+      {error && <div className="error-text">{error}</div>}
 
       {panelOpen && (
         <OrderPanel event={activeEvent} editingOrder={editingOrder} onCancel={closePanel} onSave={handleSaveOrder} />

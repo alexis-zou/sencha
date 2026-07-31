@@ -2,10 +2,17 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import {
+  fetchOrdersByEvent,
+  createOrder as createOrderRemote,
+  updateOrder as updateOrderRemote,
+  setOrderDone as setOrderDoneRemote,
+  deleteOrder as deleteOrderRemote,
+} from '@/lib/supabase/orders';
 import { storage } from '@/lib/storage';
 import { eventsKey, menuTemplateKey } from '@/lib/constants';
 import { uid } from '@/lib/id';
-import { AuthMode, MainPage, MenuTemplate, PopupEvent, ViewName } from '@/lib/types';
+import { AuthMode, MainPage, MenuTemplate, Order, OrderLineItem, PopupEvent, ViewName } from '@/lib/types';
 
 export interface NewEventInput {
   eventName: string;
@@ -48,6 +55,14 @@ interface AppStateValue {
   updateActiveEvent: (updater: (ev: PopupEvent) => PopupEvent) => void;
   saveMenuTemplate: (tpl: MenuTemplate) => Promise<void>;
   loadMenuTemplate: () => Promise<MenuTemplate | null>;
+
+  // Orders live in Supabase now (see lib/supabase/orders.ts) -- these are
+  // the only way to mutate an order; updateActiveEvent no longer touches
+  // ev.orders directly (see OrdersPage.tsx).
+  addOrder: (note: string, items: OrderLineItem[]) => Promise<void>;
+  editOrder: (orderId: string, note: string, items: OrderLineItem[]) => Promise<void>;
+  toggleOrderDone: (orderId: string) => Promise<void>;
+  deleteOrder: (orderId: string) => Promise<void>;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -66,18 +81,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [authInfo, setAuthInfo] = useState('');
 
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [events, setEvents] = useState<PopupEvent[]>([]);
+  // Orders, keyed by event id -- fetched from Supabase, kept separate from
+  // `events` (which stays localStorage-backed and never carries real order
+  // data anymore; see the merge in eventsWithOrders below).
+  const [ordersByEvent, setOrdersByEvent] = useState<Record<string, Order[]>>({});
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [summaryEventId, setSummaryEventId] = useState<string | null>(null);
   const [activePage, setActivePage] = useState<MainPage>('orders');
 
   const supabase = useMemo(() => createClient(), []);
 
-  async function loadUserInto(email: string) {
+  async function loadUserInto(email: string, userId: string) {
     const evRes = await storage.get(eventsKey(email));
     const loadedEvents: PopupEvent[] = evRes?.value ? JSON.parse(evRes.value) : [];
     setCurrentUser(email);
+    setCurrentUserId(userId);
     setEvents(normalizeEvents(loadedEvents));
+    const grouped = await fetchOrdersByEvent(supabase, userId);
+    setOrdersByEvent(grouped);
     setView((v) => (v === 'setup' || v === 'main' || v === 'summary' ? v : 'home'));
   }
 
@@ -92,11 +115,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       const email = session?.user?.email;
-      if (email) {
-        loadUserInto(email);
+      const userId = session?.user?.id;
+      if (email && userId) {
+        loadUserInto(email, userId);
       } else {
         setCurrentUser(null);
+        setCurrentUserId(null);
         setEvents([]);
+        setOrdersByEvent({});
         setActiveEventId(null);
         setSummaryEventId(null);
         // An explicit sign-out (or a session lost elsewhere) drops straight
@@ -246,14 +272,60 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setEvents((prev) => prev.map((e) => (e.id === activeEventId ? updater(e) : e)));
   }
 
+  // Single merge point: every event handed to the rest of the app gets its
+  // `.orders` overlaid from Supabase, so HomeScreen, InventoryPage's stock
+  // math, SummaryPage, TicketCard etc. all keep working unmodified -- they
+  // still just read `event.orders`, unaware it now comes from a different
+  // source than the rest of the event object.
+  const eventsWithOrders = useMemo(
+    () => events.map((e) => ({ ...e, orders: ordersByEvent[e.id] || [] })),
+    [events, ordersByEvent]
+  );
+
   const activeEvent = useMemo(
-    () => events.find((e) => e.id === activeEventId) || null,
-    [events, activeEventId]
+    () => eventsWithOrders.find((e) => e.id === activeEventId) || null,
+    [eventsWithOrders, activeEventId]
   );
   const summaryEvent = useMemo(
-    () => events.find((e) => e.id === summaryEventId) || null,
-    [events, summaryEventId]
+    () => eventsWithOrders.find((e) => e.id === summaryEventId) || null,
+    [eventsWithOrders, summaryEventId]
   );
+
+  async function addOrder(note: string, items: OrderLineItem[]) {
+    if (!activeEventId || !currentUserId) return;
+    const newOrder = await createOrderRemote(supabase, currentUserId, activeEventId, note, items);
+    setOrdersByEvent((prev) => ({ ...prev, [activeEventId]: [...(prev[activeEventId] || []), newOrder] }));
+  }
+
+  async function editOrder(orderId: string, note: string, items: OrderLineItem[]) {
+    if (!activeEventId) return;
+    await updateOrderRemote(supabase, orderId, note, items);
+    setOrdersByEvent((prev) => ({
+      ...prev,
+      [activeEventId]: (prev[activeEventId] || []).map((o) => (o.id === orderId ? { ...o, note, items } : o)),
+    }));
+  }
+
+  async function toggleOrderDone(orderId: string) {
+    if (!activeEventId) return;
+    const current = (ordersByEvent[activeEventId] || []).find((o) => o.id === orderId);
+    if (!current) return;
+    const nextDone = !current.done;
+    await setOrderDoneRemote(supabase, orderId, nextDone);
+    setOrdersByEvent((prev) => ({
+      ...prev,
+      [activeEventId]: (prev[activeEventId] || []).map((o) => (o.id === orderId ? { ...o, done: nextDone } : o)),
+    }));
+  }
+
+  async function deleteOrder(orderId: string) {
+    if (!activeEventId) return;
+    await deleteOrderRemote(supabase, orderId);
+    setOrdersByEvent((prev) => ({
+      ...prev,
+      [activeEventId]: (prev[activeEventId] || []).filter((o) => o.id !== orderId),
+    }));
+  }
 
   const value: AppStateValue = {
     view,
@@ -266,7 +338,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     currentUser,
-    events,
+    events: eventsWithOrders,
     activeEvent,
     activePage,
     setActivePage,
@@ -280,6 +352,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     updateActiveEvent,
     saveMenuTemplate,
     loadMenuTemplate,
+    addOrder,
+    editOrder,
+    toggleOrderDone,
+    deleteOrder,
   };
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

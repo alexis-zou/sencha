@@ -60,6 +60,7 @@
   }
   .primary-btn:active{ transform: translateY(3px); box-shadow: 0 1px 0 var(--deep-shade), 0 2px 6px rgba(69,88,38,0.14); }
   .error-text{ color: var(--danger); font-size: 13px; margin-top: 8px; font-weight: 700; }
+  .info-text{ color: var(--mid); font-size: 13px; margin-top: 8px; font-weight: 700; line-height: 1.5; }
   .hidden{ display: none !important; }
 
   /* ---------- Brand wordmark: shared "sencha" heading treatment ----------

@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { storage } from '@/lib/storage';
-import { USERS_KEY, SESSION_KEY, eventsKey, menuTemplateKey } from '@/lib/constants';
+import { eventsKey, menuTemplateKey } from '@/lib/constants';
 import { uid } from '@/lib/id';
 import { AuthMode, MainPage, MenuTemplate, PopupEvent, ViewName } from '@/lib/types';
 
@@ -24,6 +25,7 @@ interface AppStateValue {
   authMode: AuthMode;
   setAuthMode: (m: AuthMode) => void;
   authError: string;
+  authInfo: string;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -61,6 +63,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<ViewName>('landing');
   const [authMode, setAuthModeState] = useState<AuthMode>('signin');
   const [authError, setAuthError] = useState('');
+  const [authInfo, setAuthInfo] = useState('');
 
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [events, setEvents] = useState<PopupEvent[]>([]);
@@ -68,22 +71,42 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [summaryEventId, setSummaryEventId] = useState<string | null>(null);
   const [activePage, setActivePage] = useState<MainPage>('orders');
 
-  // ---- bootstrap: restore session on first load ----
+  const supabase = useMemo(() => createClient(), []);
+
+  async function loadUserInto(email: string) {
+    const evRes = await storage.get(eventsKey(email));
+    const loadedEvents: PopupEvent[] = evRes?.value ? JSON.parse(evRes.value) : [];
+    setCurrentUser(email);
+    setEvents(normalizeEvents(loadedEvents));
+    setView((v) => (v === 'setup' || v === 'main' || v === 'summary' ? v : 'home'));
+  }
+
+  // ---- auth is Supabase-backed now: one listener is the single source of
+  // truth for both the initial bootstrap (it fires once immediately with
+  // whatever session already exists, restored from Supabase's own cookie)
+  // and every later transition (sign in, sign out, token refresh, a
+  // session expiring or being revoked in another tab). This is also what
+  // "protects the dashboard": losing a valid session for any reason drops
+  // the view back to 'landing', so Home/Setup/Main/Summary are never
+  // reachable without a live Supabase session. ----
   useEffect(() => {
-    (async () => {
-      const session = await storage.get(SESSION_KEY);
-      if (session?.value) {
-        const email = session.value;
-        const evRes = await storage.get(eventsKey(email));
-        const loadedEvents: PopupEvent[] = evRes?.value ? JSON.parse(evRes.value) : [];
-        setCurrentUser(email);
-        setEvents(normalizeEvents(loadedEvents));
-        setView('home');
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      const email = session?.user?.email;
+      if (email) {
+        loadUserInto(email);
       } else {
-        setView('landing');
+        setCurrentUser(null);
+        setEvents([]);
+        setActiveEventId(null);
+        setSummaryEventId(null);
+        // An explicit sign-out (or a session lost elsewhere) drops straight
+        // to the sign-in form, same as before Supabase -- only a visitor
+        // who was never signed in at all sees the landing/marketing page.
+        setView(event === 'SIGNED_OUT' ? 'auth' : 'landing');
       }
       setLoading(false);
-    })();
+    });
+    return () => data.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -96,6 +119,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   function setAuthMode(m: AuthMode) {
     setAuthModeState(m);
     setAuthError('');
+    setAuthInfo('');
   }
 
   async function signIn(email: string, password: string) {
@@ -104,13 +128,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setAuthError('Enter both an email and a password.');
       return;
     }
-    const usersRes = await storage.get(USERS_KEY);
-    const users: Record<string, string> = usersRes?.value ? JSON.parse(usersRes.value) : {};
-    if (!users[e] || users[e] !== password) {
-      setAuthError('Incorrect email or password.');
+    setAuthError('');
+    setAuthInfo('');
+    const { error } = await supabase.auth.signInWithPassword({ email: e, password });
+    if (error) {
+      setAuthError(error.message);
       return;
     }
-    await logInAs(e);
+    // onAuthStateChange fires SIGNED_IN and takes it from here.
   }
 
   async function signUp(email: string, password: string) {
@@ -119,34 +144,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setAuthError('Enter both an email and a password.');
       return;
     }
-    const usersRes = await storage.get(USERS_KEY);
-    const users: Record<string, string> = usersRes?.value ? JSON.parse(usersRes.value) : {};
-    if (users[e]) {
-      setAuthError('An account with that email already exists — try signing in instead.');
+    setAuthError('');
+    setAuthInfo('');
+    const { data, error } = await supabase.auth.signUp({ email: e, password });
+    if (error) {
+      setAuthError(error.message);
       return;
     }
-    users[e] = password;
-    await storage.set(USERS_KEY, JSON.stringify(users));
-    await logInAs(e);
-  }
-
-  async function logInAs(email: string) {
-    setAuthError('');
-    await storage.set(SESSION_KEY, email);
-    const evRes = await storage.get(eventsKey(email));
-    const loadedEvents: PopupEvent[] = evRes?.value ? JSON.parse(evRes.value) : [];
-    setCurrentUser(email);
-    setEvents(normalizeEvents(loadedEvents));
-    setView('home');
+    if (!data.session) {
+      // Email confirmation is required on this project -- no session yet,
+      // so onAuthStateChange won't fire with a user until they click the
+      // confirmation link and come back to sign in.
+      setAuthInfo('Almost there — check your email to confirm your account, then sign in.');
+      setAuthModeState('signin');
+    }
+    // If a session did come back (confirmations disabled), onAuthStateChange
+    // fires SIGNED_IN and logs them straight in.
   }
 
   async function signOut() {
-    await storage.delete(SESSION_KEY);
-    setCurrentUser(null);
-    setEvents([]);
-    setActiveEventId(null);
-    setSummaryEventId(null);
-    setView('auth');
+    await supabase.auth.signOut();
+    // onAuthStateChange fires SIGNED_OUT and resets state/view.
   }
 
   function goHome() {
@@ -243,6 +261,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     authMode,
     setAuthMode,
     authError,
+    authInfo,
     signIn,
     signUp,
     signOut,

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useAppState } from '@/context/AppStateContext';
 
 export default function AuthScreen() {
-  const { authMode, setAuthMode, authError, signIn, signUp } = useAppState();
+  const { authMode, setAuthMode, authError, authInfo, signIn, signUp } = useAppState();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -67,13 +67,14 @@ export default function AuthScreen() {
           />
         </div>
         {authError && <div className="error-text">{authError}</div>}
+        {authInfo && <div className="info-text">{authInfo}</div>}
         <button className="primary-btn" onClick={handleSubmit}>
           {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
         </button>
       </div>
       <p className="auth-note">
-        Your account and events are stored only on this device — this is a lightweight sign-in for organizing your
-        own pop-ups, not secure authentication.
+        Your account is secured by Supabase — your pop-up events are still stored only on this device, but signing in
+        is real authentication now, not a local password list.
       </p>
     </div>
   );

@@ -35,9 +35,19 @@
   /* Each top-level screen gets its own soft matcha gradient rather than
      sitting flush against #app's flat cream — keeps screens feeling like
      distinct "pages" instead of blending into one continuous background. */
-  #landing-view, #auth-view, #home-view, #setup-view, #main-view, #summary-view{
+  #landing-view, #auth-view, #home-view, #setup-view, #main-view, #summary-view, #loading-view{
     min-height: 100vh;
     background: linear-gradient(165deg, var(--cream) 0%, var(--pale) 100%);
+  }
+
+  .loading-view{ display:flex; align-items:center; justify-content:center; }
+  .loading-icon{ animation: loadingPulse 1.4s ease-in-out infinite; }
+  @keyframes loadingPulse{
+    0%, 100%{ opacity: 0.55; transform: scale(0.96); }
+    50%{ opacity: 1; transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .loading-icon{ animation: none; }
   }
 
   .field-label{ font-size: 13px; font-weight: 700; color: var(--deep); margin-bottom: 7px; display:block; }
@@ -462,6 +472,8 @@
   .ticket-card::before{ top:-8px; background-position: left bottom; }
   .ticket-card::after{ bottom:-8px; background-position: left top; }
   .ticket-card.done{ background: var(--pale); }
+  .ticket-card.busy{ opacity: 0.6; }
+  .ticket-card .check-circle:disabled, .ticket-card .del-btn:disabled{ cursor: default; opacity: 0.6; }
   .ticket-card.just-completed{ animation: completePulse 0.45s ease; }
   @keyframes completePulse{ 0%{ transform:scale(1); } 35%{ transform:scale(1.035); } 100%{ transform:scale(1); } }
 

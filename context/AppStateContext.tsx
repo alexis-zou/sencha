@@ -31,6 +31,7 @@ import {
 } from '@/lib/supabase/notifications';
 import { storage } from '@/lib/storage';
 import { menuTemplateKey } from '@/lib/constants';
+import { uid } from '@/lib/id';
 import { AuthMode, MainPage, MenuTemplate, Order, OrderLineItem, PopupEvent, ViewName } from '@/lib/types';
 
 export interface NewEventInput {
@@ -128,6 +129,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const supabase = useMemo(() => createClient(), []);
 
+  // Single place that touches ordersByEvent's shape -- addOrder, editOrder,
+  // toggleOrderDone, deleteOrder, and the realtime handler below all used
+  // to repeat the same `{ ...prev, [eventId]: <transform>(prev[eventId]) }`
+  // spread by hand. Also used to roll an optimistic update back to its
+  // prior state if the underlying write fails.
+  function applyOrdersUpdate(eventId: string, updater: (orders: Order[]) => Order[]) {
+    setOrdersByEvent((prev) => ({ ...prev, [eventId]: updater(prev[eventId] || []) }));
+  }
+
   async function loadUserInto(email: string, userId: string) {
     setCurrentUser(email);
     setCurrentUserId(userId);
@@ -186,14 +196,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!activeEventId) return;
     const unsubscribe = subscribeToOrders(supabase, activeEventId, (event) => {
-      setOrdersByEvent((prev) => {
-        const existing = prev[activeEventId] || [];
+      applyOrdersUpdate(activeEventId, (orders) => {
         if (event.type === 'delete') {
-          return { ...prev, [activeEventId]: existing.filter((o) => o.id !== event.orderId) };
+          return orders.filter((o) => o.id !== event.orderId);
         }
-        const idx = existing.findIndex((o) => o.id === event.order.id);
-        const next = idx === -1 ? [...existing, event.order] : existing.map((o, i) => (i === idx ? event.order : o));
-        return { ...prev, [activeEventId]: next };
+        const idx = orders.findIndex((o) => o.id === event.order.id);
+        return idx === -1 ? [...orders, event.order] : orders.map((o, i) => (i === idx ? event.order : o));
       });
     });
     return unsubscribe;
@@ -360,8 +368,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   async function markNotificationsRead() {
     if (!currentUserId) return;
+    const previouslyUnreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
+    if (previouslyUnreadIds.length === 0) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    await markAllNotificationsRead(supabase, currentUserId);
+    try {
+      await markAllNotificationsRead(supabase, currentUserId);
+    } catch {
+      // Best-effort: roll the badge back rather than leave it silently
+      // wrong (server still has these unread) with no way to retell they
+      // failed -- the next bell tap just tries again.
+      setNotifications((prev) =>
+        prev.map((n) => (previouslyUnreadIds.includes(n.id) ? { ...n, isRead: false } : n))
+      );
+    }
   }
 
   function dismissToast(id: string) {
@@ -389,40 +408,80 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [eventsWithOrders, summaryEventId]
   );
 
+  // All four order mutations below are optimistic: local state updates
+  // first (so checking off / adding / deleting an order feels instant,
+  // matching the app's own "usable under time pressure" design goal),
+  // then the write fires, and on failure the optimistic change is rolled
+  // back and the error re-thrown so the calling page's own try/catch
+  // (see OrdersPage.tsx) can surface it. Contrast with createEvent/
+  // endActiveEvent/updateEventSettings, which stay await-then-update on
+  // purpose -- those are exactly the cases where showing success before
+  // it's confirmed would be wrong (e.g. navigating into an event that
+  // turns out not to have been created).
+
   async function addOrder(note: string, items: OrderLineItem[]) {
     if (!activeEventId || !currentUserId) return;
-    const newOrder = await createOrderRemote(supabase, currentUserId, activeEventId, note, items);
-    setOrdersByEvent((prev) => ({ ...prev, [activeEventId]: [...(prev[activeEventId] || []), newOrder] }));
+    const eventId = activeEventId;
+    const tempId = `temp-${uid()}`;
+    applyOrdersUpdate(eventId, (orders) => [...orders, { id: tempId, note, done: false, ts: Date.now(), items }]);
+    try {
+      const newOrder = await createOrderRemote(supabase, currentUserId, eventId, note, items);
+      applyOrdersUpdate(eventId, (orders) => {
+        const withoutTemp = orders.filter((o) => o.id !== tempId);
+        // The realtime echo of this same insert can land before this
+        // await resolves and already have added the real row -- don't
+        // add it twice.
+        return withoutTemp.some((o) => o.id === newOrder.id) ? withoutTemp : [...withoutTemp, newOrder];
+      });
+    } catch (err) {
+      applyOrdersUpdate(eventId, (orders) => orders.filter((o) => o.id !== tempId));
+      throw err;
+    }
   }
 
   async function editOrder(orderId: string, note: string, items: OrderLineItem[]) {
     if (!activeEventId) return;
-    await updateOrderRemote(supabase, orderId, note, items);
-    setOrdersByEvent((prev) => ({
-      ...prev,
-      [activeEventId]: (prev[activeEventId] || []).map((o) => (o.id === orderId ? { ...o, note, items } : o)),
-    }));
+    const eventId = activeEventId;
+    const previous = (ordersByEvent[eventId] || []).find((o) => o.id === orderId);
+    applyOrdersUpdate(eventId, (orders) => orders.map((o) => (o.id === orderId ? { ...o, note, items } : o)));
+    try {
+      await updateOrderRemote(supabase, orderId, note, items);
+    } catch (err) {
+      if (previous) {
+        applyOrdersUpdate(eventId, (orders) => orders.map((o) => (o.id === orderId ? previous : o)));
+      }
+      throw err;
+    }
   }
 
   async function toggleOrderDone(orderId: string) {
     if (!activeEventId) return;
-    const current = (ordersByEvent[activeEventId] || []).find((o) => o.id === orderId);
+    const eventId = activeEventId;
+    const current = (ordersByEvent[eventId] || []).find((o) => o.id === orderId);
     if (!current) return;
     const nextDone = !current.done;
-    await setOrderDoneRemote(supabase, orderId, nextDone);
-    setOrdersByEvent((prev) => ({
-      ...prev,
-      [activeEventId]: (prev[activeEventId] || []).map((o) => (o.id === orderId ? { ...o, done: nextDone } : o)),
-    }));
+    applyOrdersUpdate(eventId, (orders) => orders.map((o) => (o.id === orderId ? { ...o, done: nextDone } : o)));
+    try {
+      await setOrderDoneRemote(supabase, orderId, nextDone);
+    } catch (err) {
+      applyOrdersUpdate(eventId, (orders) => orders.map((o) => (o.id === orderId ? { ...o, done: current.done } : o)));
+      throw err;
+    }
   }
 
   async function deleteOrder(orderId: string) {
     if (!activeEventId) return;
-    await deleteOrderRemote(supabase, orderId);
-    setOrdersByEvent((prev) => ({
-      ...prev,
-      [activeEventId]: (prev[activeEventId] || []).filter((o) => o.id !== orderId),
-    }));
+    const eventId = activeEventId;
+    const removed = (ordersByEvent[eventId] || []).find((o) => o.id === orderId);
+    applyOrdersUpdate(eventId, (orders) => orders.filter((o) => o.id !== orderId));
+    try {
+      await deleteOrderRemote(supabase, orderId);
+    } catch (err) {
+      if (removed) {
+        applyOrdersUpdate(eventId, (orders) => (orders.some((o) => o.id === orderId) ? orders : [...orders, removed]));
+      }
+      throw err;
+    }
   }
 
   const value: AppStateValue = {

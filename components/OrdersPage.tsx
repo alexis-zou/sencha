@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppState } from '@/context/AppStateContext';
 import { Order, OrderLineItem } from '@/lib/types';
 import TicketCard from './TicketCard';
@@ -11,11 +11,23 @@ export default function OrdersPage() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
+  // Orders with a toggle/delete currently in flight -- disables that
+  // order's own actions so a slow connection can't be double-tapped into
+  // firing the same mutation twice (the mutation itself is optimistic and
+  // instant in the common case; this only shows up under real latency).
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+
+  const orders = activeEvent?.orders;
+  const pending = useMemo(
+    () => (orders || []).filter((o) => !o.done).sort((a, b) => a.ts - b.ts),
+    [orders]
+  );
+  const completed = useMemo(
+    () => (orders || []).filter((o) => o.done).sort((a, b) => b.ts - a.ts),
+    [orders]
+  );
 
   if (!activeEvent) return null;
-
-  const pending = activeEvent.orders.filter((o) => !o.done).sort((a, b) => a.ts - b.ts);
-  const completed = activeEvent.orders.filter((o) => o.done).sort((a, b) => b.ts - a.ts);
 
   function openNewOrder() {
     setEditingOrder(null);
@@ -47,21 +59,36 @@ export default function OrdersPage() {
   }
 
   async function handleToggleDone(id: string) {
+    setError('');
+    setBusyIds((prev) => new Set(prev).add(id));
     try {
-      setError('');
       await toggleOrderDone(id);
     } catch {
       setError('Could not update that order — check your connection and try again.');
+    } finally {
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   }
 
   async function handleDelete(id: string) {
+    setError('');
+    setBusyIds((prev) => new Set(prev).add(id));
     try {
-      setError('');
       await deleteOrder(id);
     } catch {
       setError('Could not delete that order — check your connection and try again.');
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
+    // No `finally` here on the success path: the order is gone from the
+    // list entirely, so there's nothing left to un-busy.
   }
 
   return (
@@ -96,6 +123,7 @@ export default function OrdersPage() {
             <TicketCard
               key={o.id}
               order={o}
+              busy={busyIds.has(o.id)}
               onToggleDone={handleToggleDone}
               onEdit={openEditOrder}
               onDelete={handleDelete}
@@ -115,6 +143,7 @@ export default function OrdersPage() {
             <TicketCard
               key={o.id}
               order={o}
+              busy={busyIds.has(o.id)}
               onToggleDone={handleToggleDone}
               onEdit={openEditOrder}
               onDelete={handleDelete}

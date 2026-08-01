@@ -49,6 +49,17 @@ function eventRowToBase(row: EventRow): Omit<PopupEvent, 'inventory' | 'menu' | 
   };
 }
 
+// Postgres `numeric` columns come back from PostgREST as JSON strings, not
+// numbers -- every price read off a row must be coerced explicitly (see the
+// same note in lib/supabase/orders.ts).
+function toMenuItem(row: MenuItemRow): MenuItem {
+  return { id: row.id, name: row.name, price: Number(row.price), type: row.type as MenuItemType };
+}
+
+function toFlavorOption(row: { id: string; name: string; price: number | string }): FlavorOption {
+  return { id: row.id, name: row.name, price: Number(row.price) };
+}
+
 // Fetches every event the signed-in user has access to -- owned or
 // invited as a collaborator (see supabase/collaboration_phase.sql) --
 // with menu items, starting inventory, and syrup/milk options assembled
@@ -92,19 +103,14 @@ export async function fetchEvents(supabase: SupabaseClient): Promise<PopupEvent[
 
   const menuByEvent: Record<string, MenuItem[]> = {};
   ((menuRows as MenuItemRow[]) || []).forEach((r) => {
-    (menuByEvent[r.event_id] ||= []).push({
-      id: r.id,
-      name: r.name,
-      price: Number(r.price),
-      type: r.type as MenuItemType,
-    });
+    (menuByEvent[r.event_id] ||= []).push(toMenuItem(r));
   });
 
   const syrupsByEvent: Record<string, FlavorOption[]> = {};
   const milksByEvent: Record<string, FlavorOption[]> = {};
   ((flavorRows as FlavorOptionRow[]) || []).forEach((r) => {
     const bucket = r.kind === 'syrup' ? syrupsByEvent : milksByEvent;
-    (bucket[r.event_id] ||= []).push({ id: r.id, name: r.name, price: Number(r.price) });
+    (bucket[r.event_id] ||= []).push(toFlavorOption(r));
   });
 
   return (eventRows as EventRow[]).map((row) => {
@@ -136,7 +142,7 @@ async function insertFlavorOptions(
     .insert(rows.map((f, i) => ({ event_id: eventId, kind, name: f.name, price: f.price, sort_order: i })))
     .select('id, name, price');
   if (error || !data) throw error || new Error(`Failed to create ${kind} options`);
-  return data.map((r) => ({ id: r.id, name: r.name, price: Number(r.price) }));
+  return data.map(toFlavorOption);
 }
 
 export async function createEventRemote(
@@ -173,12 +179,7 @@ export async function createEventRemote(
     const { error: invErr } = await supabase.from('inventory').insert(invPayload);
     if (invErr) throw invErr;
 
-    const menu = (menuRows as MenuItemRow[]).map((r) => ({
-      id: r.id,
-      name: r.name,
-      price: Number(r.price),
-      type: r.type as MenuItemType,
-    }));
+    const menu = (menuRows as MenuItemRow[]).map(toMenuItem);
     const inventory: Record<string, number> = {};
     invPayload.forEach((p) => {
       inventory[p.menu_item_id] = p.starting_count;

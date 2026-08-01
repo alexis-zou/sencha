@@ -8,12 +8,17 @@ import { burstEffect } from './Burst';
 export default function TicketCard({
   order,
   readonly = false,
+  busy = false,
   onToggleDone,
   onEdit,
   onDelete,
 }: {
   order: Order;
   readonly?: boolean;
+  // True while this specific order's toggle/delete is mid-flight --
+  // disables those actions so a slow connection can't be double-tapped
+  // into firing the same mutation twice.
+  busy?: boolean;
   onToggleDone?: (id: string) => void;
   onEdit?: (order: Order) => void;
   onDelete?: (id: string) => void;
@@ -35,7 +40,8 @@ export default function TicketCard({
     wasDoneRef.current = order.done;
   }, [order.done]);
 
-  const cardClass = 'ticket-card' + (order.done ? ' done' : '') + (justCompleted ? ' just-completed' : '');
+  const cardClass =
+    'ticket-card' + (order.done ? ' done' : '') + (justCompleted ? ' just-completed' : '') + (busy ? ' busy' : '');
 
   return (
     <div className={cardClass} onClick={() => !readonly && onEdit?.(order)}>
@@ -44,7 +50,7 @@ export default function TicketCard({
           ref={checkRef}
           className="check-circle"
           type="button"
-          disabled={readonly}
+          disabled={readonly || busy}
           onClick={(e) => {
             e.stopPropagation();
             onToggleDone?.(order.id);
@@ -68,6 +74,7 @@ export default function TicketCard({
             <button
               className="del-btn"
               type="button"
+              disabled={busy}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete?.(order.id);

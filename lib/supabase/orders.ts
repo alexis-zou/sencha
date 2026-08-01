@@ -4,7 +4,7 @@
 // (AppStateContext, OrdersPage, OrderPanel, TicketCard) still speaks
 // in the app's existing Order/OrderLineItem types from lib/types.ts.
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js';
 import { Order, OrderLineItem } from '@/lib/types';
 
 interface OrderRow {
@@ -12,7 +12,16 @@ interface OrderRow {
   event_id: string;
   note: string;
   done: boolean;
-  ts: number;
+  ts: number | string;
+}
+
+// `ts` is `bigint` in Postgres -- like `numeric`, PostgREST can hand this
+// back as a JSON string rather than a number depending on how it's fetched
+// (a plain select vs. a Realtime change payload behave differently here).
+// Order.ts is declared `number` and used for sort math (a.ts - b.ts), so
+// every row read has to coerce it explicitly rather than trust the type.
+function toOrder(row: OrderRow, items: OrderLineItem[]): Order {
+  return { id: row.id, note: row.note, done: row.done, ts: Number(row.ts), items };
 }
 
 interface OrderItemRow {
@@ -96,14 +105,7 @@ export async function fetchOrdersByEvent(supabase: SupabaseClient): Promise<Reco
 
   const grouped: Record<string, Order[]> = {};
   (orderRows as OrderRow[]).forEach((row) => {
-    const order: Order = {
-      id: row.id,
-      note: row.note,
-      done: row.done,
-      ts: row.ts,
-      items: itemsByOrder[row.id] || [],
-    };
-    (grouped[row.event_id] ||= []).push(order);
+    (grouped[row.event_id] ||= []).push(toOrder(row, itemsByOrder[row.id] || []));
   });
   return grouped;
 }
@@ -128,7 +130,7 @@ export async function createOrder(
     if (itemsErr) throw itemsErr;
   }
 
-  return { id: orderRow.id, note: orderRow.note, done: orderRow.done, ts: orderRow.ts, items };
+  return toOrder(orderRow as OrderRow, items);
 }
 
 // Full replace of an order's note + items, matching the app's existing
@@ -160,4 +162,47 @@ export async function setOrderDone(supabase: SupabaseClient, orderId: string, do
 export async function deleteOrder(supabase: SupabaseClient, orderId: string): Promise<void> {
   const { error } = await supabase.from('orders').delete().eq('id', orderId);
   if (error) throw error;
+}
+
+async function fetchItemsForOrder(supabase: SupabaseClient, orderId: string): Promise<OrderLineItem[]> {
+  const { data, error } = await supabase.from('order_items').select('*').eq('order_id', orderId);
+  if (error || !data) return [];
+  return (data as OrderItemRow[]).map(toLineItem);
+}
+
+export type OrderRealtimeEvent = { type: 'upsert'; order: Order } | { type: 'delete'; orderId: string };
+
+// Live updates for every insert/update/delete on `orders` for one event,
+// broadcast to every subscribed client (see supabase/realtime_phase.sql).
+// Deliberately only watches `orders`, not `order_items` -- every order
+// mutation in this file always touches the parent `orders` row too (see
+// updateOrder), so reacting to that and re-fetching the one order's items
+// directly covers every case without a second subscription. Returns an
+// unsubscribe function for the caller's effect cleanup.
+export function subscribeToOrders(
+  supabase: SupabaseClient,
+  eventId: string,
+  onEvent: (event: OrderRealtimeEvent) => void
+): () => void {
+  const channel = supabase
+    .channel(`orders:${eventId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'orders', filter: `event_id=eq.${eventId}` },
+      async (payload: RealtimePostgresChangesPayload<OrderRow>) => {
+        if (payload.eventType === 'DELETE') {
+          const oldId = (payload.old as Partial<OrderRow>).id;
+          if (oldId) onEvent({ type: 'delete', orderId: oldId });
+          return;
+        }
+        const row = payload.new as OrderRow;
+        const items = await fetchItemsForOrder(supabase, row.id);
+        onEvent({ type: 'upsert', order: toOrder(row, items) });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

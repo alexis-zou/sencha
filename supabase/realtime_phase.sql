@@ -1,0 +1,21 @@
+-- ============================================================
+-- Sencha -- Realtime phase
+--
+-- Enables live broadcast of INSERT/UPDATE/DELETE on public.orders to
+-- every subscribed client. Only `orders` needs to be added to the
+-- publication, not `order_items`: every order mutation in this app
+-- (create, edit note+items, toggle done, delete) always touches the
+-- parent `orders` row too (updateOrder always writes `note`, even
+-- when only the line items actually changed), so the client's
+-- subscription handler reacts to the `orders` change and re-fetches
+-- that one order's items directly -- no need to also watch
+-- order_items, which doesn't carry an event_id column to filter on
+-- anyway.
+--
+-- Realtime's Postgres Changes API respects the table's existing RLS
+-- policies -- a client only receives events for rows they could
+-- otherwise SELECT, same event_members-based scoping as everywhere
+-- else. No additional policy needed here.
+-- ============================================================
+
+alter publication supabase_realtime add table public.orders;

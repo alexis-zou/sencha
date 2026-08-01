@@ -8,6 +8,7 @@ import {
   updateOrder as updateOrderRemote,
   setOrderDone as setOrderDoneRemote,
   deleteOrder as deleteOrderRemote,
+  subscribeToOrders,
 } from '@/lib/supabase/orders';
 import {
   fetchEvents,
@@ -150,6 +151,30 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- live orders: every insert/update/delete on the active event's
+  // orders, from any connected client (including teammates on a shared
+  // event), reconciles into the same ordersByEvent state addOrder/
+  // editOrder/etc. already update optimistically for the acting client's
+  // own actions. The upsert is dedup-safe by id, so the client that made
+  // a change doesn't end up with a duplicate when its own event echoes
+  // back a moment later. ----
+  useEffect(() => {
+    if (!activeEventId) return;
+    const unsubscribe = subscribeToOrders(supabase, activeEventId, (event) => {
+      setOrdersByEvent((prev) => {
+        const existing = prev[activeEventId] || [];
+        if (event.type === 'delete') {
+          return { ...prev, [activeEventId]: existing.filter((o) => o.id !== event.orderId) };
+        }
+        const idx = existing.findIndex((o) => o.id === event.order.id);
+        const next = idx === -1 ? [...existing, event.order] : existing.map((o, i) => (i === idx ? event.order : o));
+        return { ...prev, [activeEventId]: next };
+      });
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEventId]);
 
   function setAuthMode(m: AuthMode) {
     setAuthModeState(m);

@@ -208,9 +208,15 @@ export default function SetupScreen() {
       }
     } catch (err) {
       // TEMPORARY DEBUG -- diagnosing the events-insert RLS failure.
+      // Supabase's error objects have a `.message` but aren't actual
+      // `Error` instances, so `instanceof Error` was always false here
+      // and this fell through to `String(err)` -> "[object Object]".
       const who = await debugWhoAmI();
-      const detail = err instanceof Error ? err.message : String(err);
-      setError(`Could not create your stand. DEBUG: ${detail} | whoami: ${who}`);
+      const detail =
+        err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : String(err);
+      const code =
+        err && typeof err === 'object' && 'code' in err ? ` (code: ${String((err as { code: unknown }).code)})` : '';
+      setError(`Could not create your stand. DEBUG: ${detail}${code} | whoami: ${who}`);
       setSubmitting(false);
     }
   }

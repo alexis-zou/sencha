@@ -7,6 +7,7 @@ import OrdersPage from './OrdersPage';
 import InventoryPage from './InventoryPage';
 import SummaryPage from './SummaryPage';
 import SettingsModal from './SettingsModal';
+import NotificationBell from './NotificationBell';
 
 export default function MainScreen() {
   const { activeEvent, activePage, setActivePage, goHome, endActiveEvent, updateEventSettings } = useAppState();
@@ -37,6 +38,7 @@ export default function MainScreen() {
             <span className="lbl">Income</span>
             <span className="val">{formatMoney(totalProfit(activeEvent))}</span>
           </div>
+          <NotificationBell />
           <button className="settings-btn" onClick={() => setSettingsOpen(true)}>
             ⚙
           </button>

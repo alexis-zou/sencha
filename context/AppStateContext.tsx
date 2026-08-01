@@ -23,6 +23,12 @@ import {
   checkEmailRegistered as checkEmailRegisteredRemote,
   EventMember,
 } from '@/lib/supabase/members';
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  subscribeToNotifications,
+  AppNotification,
+} from '@/lib/supabase/notifications';
 import { storage } from '@/lib/storage';
 import { menuTemplateKey } from '@/lib/constants';
 import { AuthMode, MainPage, MenuTemplate, Order, OrderLineItem, PopupEvent, ViewName } from '@/lib/types';
@@ -87,6 +93,15 @@ interface AppStateValue {
   fetchEventMembers: (eventId: string) => Promise<EventMember[]>;
   inviteMember: (eventId: string, email: string) => Promise<EventMember>;
   checkEmailRegistered: (email: string) => Promise<boolean>;
+
+  // In-app notifications (see lib/supabase/notifications.ts). Spans every
+  // event the user belongs to, not just the active one -- a teammate's
+  // change should surface even while browsing Home or a different event.
+  notifications: AppNotification[];
+  unreadCount: number;
+  markNotificationsRead: () => Promise<void>;
+  toasts: AppNotification[];
+  dismissToast: (id: string) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -108,15 +123,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [summaryEventId, setSummaryEventId] = useState<string | null>(null);
   const [activePage, setActivePage] = useState<MainPage>('orders');
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [toasts, setToasts] = useState<AppNotification[]>([]);
 
   const supabase = useMemo(() => createClient(), []);
 
   async function loadUserInto(email: string, userId: string) {
     setCurrentUser(email);
     setCurrentUserId(userId);
-    const [loadedEvents, grouped] = await Promise.all([fetchEvents(supabase), fetchOrdersByEvent(supabase)]);
+    const [loadedEvents, grouped, loadedNotifications] = await Promise.all([
+      fetchEvents(supabase),
+      fetchOrdersByEvent(supabase),
+      fetchNotifications(supabase, userId),
+    ]);
     setEvents(loadedEvents);
     setOrdersByEvent(grouped);
+    setNotifications(loadedNotifications);
     setView((v) => (v === 'setup' || v === 'main' || v === 'summary' ? v : 'home'));
   }
 
@@ -139,6 +161,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setCurrentUserId(null);
         setEvents([]);
         setOrdersByEvent({});
+        setNotifications([]);
+        setToasts([]);
         setActiveEventId(null);
         setSummaryEventId(null);
         // An explicit sign-out (or a session lost elsewhere) drops straight
@@ -175,6 +199,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEventId]);
+
+  // ---- live notifications: one subscription per signed-in session (not
+  // per active event -- a teammate's change to *any* shared event should
+  // surface here, whichever screen you're actually looking at). New rows
+  // both prepend to the notifications list (badge count) and enter the
+  // toast queue (transient, see ToastHost). ----
+  useEffect(() => {
+    if (!currentUserId) return;
+    const unsubscribe = subscribeToNotifications(supabase, currentUserId, (n) => {
+      setNotifications((prev) => [n, ...prev]);
+      setToasts((prev) => [...prev, n]);
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
 
   function setAuthMode(m: AuthMode) {
     setAuthModeState(m);
@@ -319,6 +358,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return checkEmailRegisteredRemote(supabase, email);
   }
 
+  async function markNotificationsRead() {
+    if (!currentUserId) return;
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    await markAllNotificationsRead(supabase, currentUserId);
+  }
+
+  function dismissToast(id: string) {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
+
   // Single merge point: every event handed to the rest of the app gets its
   // `.orders` overlaid from Supabase, so HomeScreen, InventoryPage's stock
   // math, SummaryPage, TicketCard etc. all keep working unmodified -- they
@@ -406,6 +457,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     fetchEventMembers,
     inviteMember,
     checkEmailRegistered,
+    notifications,
+    unreadCount,
+    markNotificationsRead,
+    toasts,
+    dismissToast,
   };
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

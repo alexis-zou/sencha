@@ -2,6 +2,7 @@
 
 import { useAppState } from '@/context/AppStateContext';
 import { totalProfit, formatEventDateTime, formatMoney } from '@/lib/calculations';
+import NotificationBell from './NotificationBell';
 
 export default function HomeScreen() {
   const { currentUser, events, goToSetup, openEvent, signOut } = useAppState();
@@ -15,24 +16,27 @@ export default function HomeScreen() {
           <h1>Your Stands</h1>
           <div className="sub">{currentUser}</div>
         </div>
-        <button className="signout-btn" onClick={() => signOut()}>
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M8 3H4.5A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17H8"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-            <path
-              d="M12.5 13.5 16 10l-3.5-3.5M16 10H7.5"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>Sign out</span>
-        </button>
+        <div className="home-header-actions">
+          <NotificationBell />
+          <button className="signout-btn" onClick={() => signOut()}>
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M8 3H4.5A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17H8"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <path
+                d="M12.5 13.5 16 10l-3.5-3.5M16 10H7.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Sign out</span>
+          </button>
+        </div>
       </div>
 
       <div className="home-content">

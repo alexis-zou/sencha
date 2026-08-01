@@ -94,6 +94,7 @@ interface AppStateValue {
   fetchEventMembers: (eventId: string) => Promise<EventMember[]>;
   inviteMember: (eventId: string, email: string) => Promise<EventMember>;
   checkEmailRegistered: (email: string) => Promise<boolean>;
+  debugWhoAmI: () => Promise<string>; // TEMPORARY DEBUG -- remove after diagnosis
 
   // In-app notifications (see lib/supabase/notifications.ts). Spans every
   // event the user belongs to, not just the active one -- a teammate's
@@ -366,6 +367,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return checkEmailRegisteredRemote(supabase, email);
   }
 
+  // TEMPORARY DEBUG -- diagnosing the events-insert RLS failure. Remove
+  // once resolved (see SetupScreen.tsx's catch block, which is the only
+  // caller).
+  async function debugWhoAmI(): Promise<string> {
+    const { data, error } = await supabase.rpc('debug_whoami');
+    if (error) return `debug_whoami error: ${error.message}`;
+    return JSON.stringify(data);
+  }
+
   async function markNotificationsRead() {
     if (!currentUserId) return;
     const previouslyUnreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
@@ -516,6 +526,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     fetchEventMembers,
     inviteMember,
     checkEmailRegistered,
+    debugWhoAmI,
     notifications,
     unreadCount,
     markNotificationsRead,

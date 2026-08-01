@@ -30,7 +30,7 @@ function rowsToFlavorOptions(rows: Row[]): FlavorOption[] {
 }
 
 export default function SetupScreen() {
-  const { goHome, createEvent, saveMenuTemplate, loadMenuTemplate, checkEmailRegistered, inviteMember } =
+  const { goHome, createEvent, saveMenuTemplate, loadMenuTemplate, checkEmailRegistered, inviteMember, debugWhoAmI } =
     useAppState();
 
   const [page, setPage] = useState(0);
@@ -206,8 +206,11 @@ export default function SetupScreen() {
       if (inviteEmails.length > 0) {
         await Promise.all(inviteEmails.map((email) => inviteMember(newEvent.id, email)));
       }
-    } catch {
-      setError('Could not create your stand — check your connection and try again.');
+    } catch (err) {
+      // TEMPORARY DEBUG -- diagnosing the events-insert RLS failure.
+      const who = await debugWhoAmI();
+      const detail = err instanceof Error ? err.message : String(err);
+      setError(`Could not create your stand. DEBUG: ${detail} | whoami: ${who}`);
       setSubmitting(false);
     }
   }

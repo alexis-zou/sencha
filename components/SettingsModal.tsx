@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PopupEvent } from '@/lib/types';
+import { useAppState } from '@/context/AppStateContext';
+import { EventMember } from '@/lib/supabase/members';
 
 export default function SettingsModal({
   event,
@@ -14,6 +16,7 @@ export default function SettingsModal({
     patch: Partial<Pick<PopupEvent, 'eventName' | 'eventDate' | 'startTime' | 'endTime' | 'inventory'>>
   ) => Promise<void>;
 }) {
+  const { fetchEventMembers, inviteMember } = useAppState();
   const [eventName, setEventName] = useState(event.eventName);
   const [eventDate, setEventDate] = useState(event.eventDate || '');
   const [startTime, setStartTime] = useState(event.startTime || '');
@@ -23,6 +26,42 @@ export default function SettingsModal({
   );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [members, setMembers] = useState<EventMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSuccess, setInviteSuccess] = useState('');
+  const [inviting, setInviting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setMembers(await fetchEventMembers());
+      setMembersLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleInvite() {
+    const email = inviteEmail.trim();
+    if (!email) {
+      setInviteError('Enter an email address.');
+      return;
+    }
+    setInviteError('');
+    setInviteSuccess('');
+    setInviting(true);
+    try {
+      const member = await inviteMember(email);
+      setMembers((prev) => [...prev, member]);
+      setInviteEmail('');
+      setInviteSuccess(`${member.email} can now access this stand.`);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Could not send that invite — try again.');
+    } finally {
+      setInviting(false);
+    }
+  }
 
   async function handleSave() {
     const inventory: Record<string, number> = { ...event.inventory };
@@ -88,6 +127,36 @@ export default function SettingsModal({
             </div>
           ))}
         </div>
+
+        <div className="field-group">
+          <label className="field-label">Team</label>
+          {!membersLoading &&
+            members.map((m) => (
+              <div className="inv-item-row" key={m.userId}>
+                <div className="inv-item-label">
+                  <span>{m.email}</span>
+                </div>
+                <span className={'type-tag ' + (m.role === 'owner' ? 'drink' : 'item')}>
+                  {m.role === 'owner' ? 'Owner' : 'Staff'}
+                </span>
+              </div>
+            ))}
+          <div className="settings-invite-row">
+            <input
+              className="text-input"
+              type="email"
+              placeholder="teammate@example.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <button className="add-row-btn" type="button" onClick={handleInvite} disabled={inviting}>
+              {inviting ? 'Inviting…' : '+ Invite'}
+            </button>
+          </div>
+          {inviteError && <div className="error-text">{inviteError}</div>}
+          {inviteSuccess && <div className="info-text">{inviteSuccess}</div>}
+        </div>
+
         {error && <div className="error-text">{error}</div>}
         <button className="primary-btn" onClick={handleSave} disabled={saving}>
           {saving ? 'Saving…' : 'Save changes'}

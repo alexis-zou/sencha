@@ -71,17 +71,15 @@ function toItemRows(orderId: string, items: OrderLineItem[]) {
   }));
 }
 
-// Fetches every order belonging to the signed-in user, across all of
-// their events, grouped by event_id -- mirrors how the app already
-// loads its entire events[] array in one shot at login.
-export async function fetchOrdersByEvent(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<Record<string, Order[]>> {
+// Fetches every order across every event the signed-in user has access
+// to -- owned or invited -- grouped by event_id. No client-side "who
+// created this order" filter: RLS on `orders` scopes this to
+// event_members, not orders.user_id, specifically so a shared event
+// shows orders every member added, not just the current user's own.
+export async function fetchOrdersByEvent(supabase: SupabaseClient): Promise<Record<string, Order[]>> {
   const { data: orderRows, error: ordersErr } = await supabase
     .from('orders')
-    .select('id, event_id, note, done, ts')
-    .eq('user_id', userId);
+    .select('id, event_id, note, done, ts');
   if (ordersErr || !orderRows) return {};
 
   const orderIds = orderRows.map((o) => o.id);

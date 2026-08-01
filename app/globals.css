@@ -287,6 +287,10 @@
   .inv-item-label span:first-child{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .inv-item-input{ width: 84px; flex: none; text-align: center; padding: 11px 8px; }
 
+  .settings-invite-row{ display:flex; gap: 8px; align-items:center; margin-top: 4px; }
+  .settings-invite-row .text-input{ flex: 1; }
+  .settings-invite-row .add-row-btn{ width: auto; flex: none; margin-top: 0; padding: 12px 16px; white-space: nowrap; }
+
   /* ---------- Setup wizard (swipeable pages) ---------- */
   .wizard-dots{ display:flex; justify-content:center; gap: 8px; margin-bottom: 18px; }
   .wizard-dot{ width: 8px; height: 8px; border-radius: 50%; border: none; background: var(--light); padding: 0; transition: background 0.2s ease, transform 0.2s ease; }

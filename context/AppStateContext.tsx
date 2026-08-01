@@ -16,6 +16,7 @@ import {
   endEventRemote,
   EventSettingsPatch,
 } from '@/lib/supabase/events';
+import { fetchMembers, inviteMember as inviteMemberRemote, EventMember } from '@/lib/supabase/members';
 import { storage } from '@/lib/storage';
 import { menuTemplateKey } from '@/lib/constants';
 import { AuthMode, MainPage, MenuTemplate, Order, OrderLineItem, PopupEvent, ViewName } from '@/lib/types';
@@ -68,6 +69,11 @@ interface AppStateValue {
   editOrder: (orderId: string, note: string, items: OrderLineItem[]) => Promise<void>;
   toggleOrderDone: (orderId: string) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
+
+  // Collaborative access (see lib/supabase/members.ts). Only the event's
+  // owner can invite -- enforced by RLS, not by hiding the action here.
+  fetchEventMembers: () => Promise<EventMember[]>;
+  inviteMember: (email: string) => Promise<EventMember>;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -95,10 +101,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   async function loadUserInto(email: string, userId: string) {
     setCurrentUser(email);
     setCurrentUserId(userId);
-    const [loadedEvents, grouped] = await Promise.all([
-      fetchEvents(supabase, userId),
-      fetchOrdersByEvent(supabase, userId),
-    ]);
+    const [loadedEvents, grouped] = await Promise.all([fetchEvents(supabase), fetchOrdersByEvent(supabase)]);
     setEvents(loadedEvents);
     setOrdersByEvent(grouped);
     setView((v) => (v === 'setup' || v === 'main' || v === 'summary' ? v : 'home'));
@@ -266,6 +269,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  async function fetchEventMembers(): Promise<EventMember[]> {
+    if (!activeEventId) return [];
+    return fetchMembers(supabase, activeEventId);
+  }
+
+  async function inviteMember(email: string): Promise<EventMember> {
+    if (!activeEventId) throw new Error('No active event.');
+    return inviteMemberRemote(supabase, activeEventId, email);
+  }
+
   // Single merge point: every event handed to the rest of the app gets its
   // `.orders` overlaid from Supabase, so HomeScreen, InventoryPage's stock
   // math, SummaryPage, TicketCard etc. all keep working unmodified -- they
@@ -350,6 +363,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     editOrder,
     toggleOrderDone,
     deleteOrder,
+    fetchEventMembers,
+    inviteMember,
   };
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

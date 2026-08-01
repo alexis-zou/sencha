@@ -49,15 +49,19 @@ function eventRowToBase(row: EventRow): Omit<PopupEvent, 'inventory' | 'menu' | 
   };
 }
 
-// Fetches every event belonging to the signed-in user, with their menu
-// items, starting inventory, and syrup/milk options assembled into the
-// app's existing PopupEvent shape. `orders` always comes back empty --
-// AppStateContext merges those in separately from lib/supabase/orders.ts.
-export async function fetchEvents(supabase: SupabaseClient, userId: string): Promise<PopupEvent[]> {
+// Fetches every event the signed-in user has access to -- owned or
+// invited as a collaborator (see supabase/collaboration_phase.sql) --
+// with menu items, starting inventory, and syrup/milk options assembled
+// into the app's existing PopupEvent shape. No client-side ownership
+// filter here: RLS on the `events` table already scopes this to
+// event_members rows for the current user, so a plain select returns
+// exactly the right set for owner and invited members alike. `orders`
+// always comes back empty -- AppStateContext merges those in separately
+// from lib/supabase/orders.ts.
+export async function fetchEvents(supabase: SupabaseClient): Promise<PopupEvent[]> {
   const { data: eventRows, error } = await supabase
     .from('events')
-    .select('id, event_name, event_date, start_time, end_time, status, created_at, ended_at')
-    .eq('user_id', userId);
+    .select('id, event_name, event_date, start_time, end_time, status, created_at, ended_at');
   if (error || !eventRows || eventRows.length === 0) return [];
 
   const eventIds = (eventRows as EventRow[]).map((e) => e.id);

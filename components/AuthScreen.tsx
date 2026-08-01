@@ -73,8 +73,8 @@ export default function AuthScreen() {
         </button>
       </div>
       <p className="auth-note">
-        Your account is secured by Supabase — your pop-up events are still stored only on this device, but signing in
-        is real authentication now, not a local password list.
+        Your account and your stands are backed by Supabase — sign in from any device, invite teammates to a shared
+        stand, and see their orders update live.
       </p>
     </div>
   );

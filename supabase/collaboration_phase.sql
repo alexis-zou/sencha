@@ -20,6 +20,18 @@
 -- is NOT a tiered permission system) -- the one owner-only action is
 -- inviting/removing members. Notifications are explicitly out of
 -- scope for this phase.
+--
+-- KNOWN BUG, fixed later: the "members can view their event's roster"
+-- policy below checks membership by querying event_members from
+-- within a policy ON event_members, which causes Postgres to detect
+-- infinite recursion (42P17) -- and since every other policy in this
+-- file also queries event_members to check membership, the recursion
+-- radiates out to nearly every table here. Left as-written for an
+-- accurate history of what actually ran (same convention as every
+-- other superseded policy in this project -- see collaboration_phase
+-- itself dropping and replacing orders_phase's owner-only policies).
+-- See supabase/fix_event_members_recursion.sql for the real fix --
+-- do not copy this file's roster policy pattern anywhere else.
 -- ============================================================
 
 -- ---------- 1. public.users ----------

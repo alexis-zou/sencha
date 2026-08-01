@@ -29,6 +29,15 @@
 -- theoretical gap between a DROP and its CREATE fails *closed*, not
 -- open -- the transaction wrapper just avoids even a transient
 -- rejected request).
+--
+-- KNOWN BUG, fixed later: this file re-declared event_members'
+-- "view roster" policy verbatim (only adding `to authenticated`),
+-- carrying forward a self-referential subquery that causes Postgres
+-- to detect infinite recursion (42P17) -- the audit that produced
+-- this file traced through every policy's *logic* but didn't catch
+-- that this one queries the very table it's attached to. See
+-- supabase/fix_event_members_recursion.sql for the real fix; left
+-- as-written here for an accurate history of what actually ran.
 -- ============================================================
 
 begin;

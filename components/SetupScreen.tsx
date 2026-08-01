@@ -13,8 +13,9 @@ interface Row {
 
 const newRow = (): Row => ({ id: uid(), name: '', price: '' });
 
-const PAGE_COUNT = 3;
-const PAGE_TITLES = ['Event details', 'Build your menu', 'Starting inventory'];
+const PAGE_COUNT = 4;
+const PAGE_TITLES = ['Event details', 'Build your menu', 'Starting inventory', 'Invite your team'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function rowsToMenuItems(rows: Row[], type: MenuItemType): MenuItem[] {
   return rows
@@ -29,7 +30,8 @@ function rowsToFlavorOptions(rows: Row[]): FlavorOption[] {
 }
 
 export default function SetupScreen() {
-  const { goHome, createEvent, saveMenuTemplate, loadMenuTemplate } = useAppState();
+  const { goHome, createEvent, saveMenuTemplate, loadMenuTemplate, checkEmailRegistered, inviteMember } =
+    useAppState();
 
   const [page, setPage] = useState(0);
 
@@ -42,6 +44,7 @@ export default function SetupScreen() {
   const [itemRows, setItemRows] = useState<Row[]>([newRow()]);
   const [syrupRows, setSyrupRows] = useState<Row[]>([newRow()]);
   const [milkRows, setMilkRows] = useState<Row[]>([newRow()]);
+  const [inviteRows, setInviteRows] = useState<Row[]>([newRow()]);
   const [savedMsg, setSavedMsg] = useState('');
 
   const [invValues, setInvValues] = useState<Record<string, string>>({});
@@ -73,7 +76,8 @@ export default function SetupScreen() {
   const page0Ref = useRef<HTMLDivElement>(null);
   const page1Ref = useRef<HTMLDivElement>(null);
   const page2Ref = useRef<HTMLDivElement>(null);
-  const pageRefs = [page0Ref, page1Ref, page2Ref];
+  const page3Ref = useRef<HTMLDivElement>(null);
+  const pageRefs = [page0Ref, page1Ref, page2Ref, page3Ref];
   const [viewportHeight, setViewportHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
@@ -126,6 +130,20 @@ export default function SetupScreen() {
     setPage((p) => p + 1);
   }
 
+  function handleContinueFromInventory() {
+    let invError = false;
+    trackableItems.forEach((m) => {
+      const n = parseInt(invValues[m.id] ?? '', 10);
+      if (isNaN(n) || n < 0) invError = true;
+    });
+    if (invError) {
+      setError('Enter a starting count (0 or more) for every item.');
+      return;
+    }
+    setError('');
+    setPage((p) => p + 1);
+  }
+
   async function handleStartSelling() {
     const menu = trackableItems;
     if (menu.length === 0) {
@@ -145,10 +163,36 @@ export default function SetupScreen() {
       setPage(2);
       return;
     }
+
+    const inviteEmails = inviteRows.map((r) => r.name.trim()).filter(Boolean);
+    const badFormat = inviteEmails.find((e) => !EMAIL_RE.test(e));
+    if (badFormat) {
+      setError(`"${badFormat}" doesn't look like a valid email address.`);
+      setPage(3);
+      return;
+    }
+
     setError('');
     setSubmitting(true);
     try {
-      await createEvent({
+      // Validate every invite is a registered account *before* creating
+      // anything -- if this ran after createEvent, a bad email would
+      // leave a real event behind with no safe way to retry without
+      // creating a duplicate.
+      if (inviteEmails.length > 0) {
+        const checks = await Promise.all(
+          inviteEmails.map(async (email) => ({ email, ok: await checkEmailRegistered(email) }))
+        );
+        const notRegistered = checks.filter((c) => !c.ok).map((c) => c.email);
+        if (notRegistered.length > 0) {
+          setError(`No registered Sencha account for: ${notRegistered.join(', ')}.`);
+          setPage(3);
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      const newEvent = await createEvent({
         eventName: eventName.trim() || 'My Stand',
         eventDate,
         startTime,
@@ -158,6 +202,10 @@ export default function SetupScreen() {
         syrups: rowsToFlavorOptions(syrupRows),
         milks: rowsToFlavorOptions(milkRows),
       });
+
+      if (inviteEmails.length > 0) {
+        await Promise.all(inviteEmails.map((email) => inviteMember(newEvent.id, email)));
+      }
     } catch {
       setError('Could not create your stand — check your connection and try again.');
       setSubmitting(false);
@@ -237,12 +285,13 @@ export default function SetupScreen() {
         <div
           className="wizard-track"
           style={{
+            width: `${PAGE_COUNT * 100}%`,
             transform: `translateX(${-page * (100 / PAGE_COUNT)}%)`,
             transition: 'transform 0.42s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           {/* ---------- Page 1: event details ---------- */}
-          <div className="wizard-page" ref={page0Ref}>
+          <div className="wizard-page" style={{ width: `${100 / PAGE_COUNT}%` }} ref={page0Ref}>
             <div className="detail-card">
               <div className="detail-row">
                 <input
@@ -287,7 +336,7 @@ export default function SetupScreen() {
           </div>
 
           {/* ---------- Page 2: menu ---------- */}
-          <div className="wizard-page" ref={page1Ref}>
+          <div className="wizard-page" style={{ width: `${100 / PAGE_COUNT}%` }} ref={page1Ref}>
             <div className="menu-section menu-section-drinks">
               <div className="menu-section-title">
                 <span className="menu-section-icon">🥤</span> Drinks
@@ -335,7 +384,7 @@ export default function SetupScreen() {
           </div>
 
           {/* ---------- Page 3: starting inventory ---------- */}
-          <div className="wizard-page" ref={page2Ref}>
+          <div className="wizard-page" style={{ width: `${100 / PAGE_COUNT}%` }} ref={page2Ref}>
             {trackableItems.length === 0 ? (
               <div className="empty-state">
                 <span className="display">Nothing to stock yet</span>
@@ -368,6 +417,43 @@ export default function SetupScreen() {
               </div>
             )}
           </div>
+
+          {/* ---------- Page 4: invite your team ---------- */}
+          <div className="wizard-page" style={{ width: `${100 / PAGE_COUNT}%` }} ref={page3Ref}>
+            <div className="menu-section menu-section-drinks">
+              <div className="menu-section-title">
+                <span className="menu-section-icon">🤝</span> Invite your team
+              </div>
+              <p className="wizard-invite-blurb">
+                Add teammates who already have a Sencha account — they&apos;ll get full access to this stand as soon
+                as it&apos;s created. Optional; you can always invite people later from Settings.
+              </p>
+              <div className="detail-card">
+                {inviteRows.map((row) => (
+                  <div className="detail-row detail-row-menu" key={row.id}>
+                    <input
+                      className="detail-title-input"
+                      type="email"
+                      placeholder="teammate@example.com"
+                      value={row.name}
+                      onChange={(e) => updateRow(setInviteRows, row.id, { name: e.target.value })}
+                    />
+                    <button
+                      className="detail-row-remove"
+                      type="button"
+                      onClick={() => removeRow(setInviteRows, row.id)}
+                      aria-label="Remove"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button className="add-row-btn" type="button" onClick={() => addRow(setInviteRows)}>
+                + Add teammate
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -378,7 +464,9 @@ export default function SetupScreen() {
           <button
             className="confirm-btn"
             type="button"
-            onClick={page === 1 ? handleContinueFromMenu : () => setPage((p) => p + 1)}
+            onClick={
+              page === 1 ? handleContinueFromMenu : page === 2 ? handleContinueFromInventory : () => setPage((p) => p + 1)
+            }
           >
             Continue →
           </button>

@@ -34,19 +34,31 @@ export async function fetchMembers(supabase: SupabaseClient, eventId: string): P
   }));
 }
 
+async function lookupUserByEmail(
+  supabase: SupabaseClient,
+  email: string
+): Promise<{ id: string; email: string } | null> {
+  const normalized = email.trim().toLowerCase();
+  const { data, error } = await supabase.from('users').select('id, email').eq('email', normalized).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// Read-only: does a registered Sencha account exist at this email? Used
+// to validate every address on the setup wizard's invite page *before*
+// the event (and its menu/inventory) gets created, so a bad email
+// doesn't leave a half-created event behind that can't be safely retried
+// without duplicating it.
+export async function checkEmailRegistered(supabase: SupabaseClient, email: string): Promise<boolean> {
+  return (await lookupUserByEmail(supabase, email)) !== null;
+}
+
 // Looks up a registered account by exact email and adds them to the
 // event's roster. Throws a friendly, specific message for the two
 // expected failure cases (no such account / already a member) so the
 // UI can show something more useful than a generic error.
 export async function inviteMember(supabase: SupabaseClient, eventId: string, email: string): Promise<EventMember> {
-  const normalized = email.trim().toLowerCase();
-
-  const { data: userRow, error: lookupErr } = await supabase
-    .from('users')
-    .select('id, email')
-    .eq('email', normalized)
-    .maybeSingle();
-  if (lookupErr) throw lookupErr;
+  const userRow = await lookupUserByEmail(supabase, email);
   if (!userRow) throw new Error('No registered Sencha account found with that email.');
 
   const { error: insertErr } = await supabase

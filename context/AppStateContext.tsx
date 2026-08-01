@@ -16,7 +16,12 @@ import {
   endEventRemote,
   EventSettingsPatch,
 } from '@/lib/supabase/events';
-import { fetchMembers, inviteMember as inviteMemberRemote, EventMember } from '@/lib/supabase/members';
+import {
+  fetchMembers,
+  inviteMember as inviteMemberRemote,
+  checkEmailRegistered as checkEmailRegisteredRemote,
+  EventMember,
+} from '@/lib/supabase/members';
 import { storage } from '@/lib/storage';
 import { menuTemplateKey } from '@/lib/constants';
 import { AuthMode, MainPage, MenuTemplate, Order, OrderLineItem, PopupEvent, ViewName } from '@/lib/types';
@@ -56,7 +61,7 @@ interface AppStateValue {
   goHome: () => void;
   goToAuth: () => void;
   goToSetup: () => void;
-  createEvent: (input: NewEventInput) => Promise<void>;
+  createEvent: (input: NewEventInput) => Promise<PopupEvent>;
   openEvent: (id: string) => void;
   endActiveEvent: () => Promise<void>;
   updateEventSettings: (patch: EventSettingsPatch) => Promise<void>;
@@ -72,8 +77,15 @@ interface AppStateValue {
 
   // Collaborative access (see lib/supabase/members.ts). Only the event's
   // owner can invite -- enforced by RLS, not by hiding the action here.
-  fetchEventMembers: () => Promise<EventMember[]>;
-  inviteMember: (email: string) => Promise<EventMember>;
+  // Both take an explicit eventId (not the implicit activeEventId the
+  // order functions use) because the setup wizard needs to invite right
+  // after creating a brand-new event, in the same handler -- the
+  // component's `inviteMember` closure wouldn't see a freshly-set
+  // activeEventId until the next render, so implicit lookup would invite
+  // against the wrong (or no) event.
+  fetchEventMembers: (eventId: string) => Promise<EventMember[]>;
+  inviteMember: (eventId: string, email: string) => Promise<EventMember>;
+  checkEmailRegistered: (email: string) => Promise<boolean>;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -204,13 +216,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setView('setup');
   }
 
-  async function createEvent(input: NewEventInput) {
-    if (!currentUserId) return;
+  async function createEvent(input: NewEventInput): Promise<PopupEvent> {
+    if (!currentUserId) throw new Error('Not signed in.');
     const newEvent = await createEventRemote(supabase, currentUserId, input);
     setEvents((prev) => [...prev, newEvent]);
     setActiveEventId(newEvent.id);
     setActivePage('orders');
     setView('main');
+    return newEvent;
   }
 
   async function saveMenuTemplate(tpl: MenuTemplate) {
@@ -269,14 +282,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  async function fetchEventMembers(): Promise<EventMember[]> {
-    if (!activeEventId) return [];
-    return fetchMembers(supabase, activeEventId);
+  async function fetchEventMembers(eventId: string): Promise<EventMember[]> {
+    return fetchMembers(supabase, eventId);
   }
 
-  async function inviteMember(email: string): Promise<EventMember> {
-    if (!activeEventId) throw new Error('No active event.');
-    return inviteMemberRemote(supabase, activeEventId, email);
+  async function inviteMember(eventId: string, email: string): Promise<EventMember> {
+    return inviteMemberRemote(supabase, eventId, email);
+  }
+
+  async function checkEmailRegistered(email: string): Promise<boolean> {
+    return checkEmailRegisteredRemote(supabase, email);
   }
 
   // Single merge point: every event handed to the rest of the app gets its
@@ -365,6 +380,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     deleteOrder,
     fetchEventMembers,
     inviteMember,
+    checkEmailRegistered,
   };
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

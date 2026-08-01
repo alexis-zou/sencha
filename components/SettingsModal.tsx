@@ -36,7 +36,7 @@ export default function SettingsModal({
 
   useEffect(() => {
     (async () => {
-      setMembers(await fetchEventMembers());
+      setMembers(await fetchEventMembers(event.id));
       setMembersLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,7 +52,7 @@ export default function SettingsModal({
     setInviteSuccess('');
     setInviting(true);
     try {
-      const member = await inviteMember(email);
+      const member = await inviteMember(event.id, email);
       setMembers((prev) => [...prev, member]);
       setInviteEmail('');
       setInviteSuccess(`${member.email} can now access this stand.`);
@@ -110,25 +110,6 @@ export default function SettingsModal({
           </div>
         </div>
         <div className="field-group">
-          <label className="field-label">Starting inventory</label>
-          {event.menu.map((m) => (
-            <div className="inv-item-row" key={m.id}>
-              <div className="inv-item-label">
-                <span>{m.name}</span>
-                <span className={'type-tag ' + m.type}>{m.type === 'drink' ? 'Drink' : 'Item'}</span>
-              </div>
-              <input
-                className="text-input inv-item-input"
-                type="number"
-                min={0}
-                value={invValues[m.id] ?? ''}
-                onChange={(e) => setInvValues((v) => ({ ...v, [m.id]: e.target.value }))}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="field-group">
           <label className="field-label">Team</label>
           {!membersLoading &&
             members.map((m) => (
@@ -155,6 +136,25 @@ export default function SettingsModal({
           </div>
           {inviteError && <div className="error-text">{inviteError}</div>}
           {inviteSuccess && <div className="info-text">{inviteSuccess}</div>}
+        </div>
+
+        <div className="field-group">
+          <label className="field-label">Starting inventory</label>
+          {event.menu.map((m) => (
+            <div className="inv-item-row" key={m.id}>
+              <div className="inv-item-label">
+                <span>{m.name}</span>
+                <span className={'type-tag ' + m.type}>{m.type === 'drink' ? 'Drink' : 'Item'}</span>
+              </div>
+              <input
+                className="text-input inv-item-input"
+                type="number"
+                min={0}
+                value={invValues[m.id] ?? ''}
+                onChange={(e) => setInvValues((v) => ({ ...v, [m.id]: e.target.value }))}
+              />
+            </div>
+          ))}
         </div>
 
         {error && <div className="error-text">{error}</div>}

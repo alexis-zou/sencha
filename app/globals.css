@@ -324,14 +324,14 @@
     background: var(--deep); color: var(--cream);
     padding: 14px 18px 16px; border-radius: 0 0 22px 22px;
     box-shadow: 0 4px 14px rgba(69,88,38,0.18);
-    display:flex; align-items:flex-start; justify-content: space-between; gap: 10px;
+    display:flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px;
   }
-  .topbar-left{ display:flex; align-items:flex-start; gap: 8px; min-width:0; }
+  .topbar-left{ display:flex; align-items:flex-start; gap: 8px; flex: 1 1 90px; min-width: 90px; }
   .home-btn{ background: rgba(255,255,255,0.12); border:none; color: var(--cream); width: 32px; height: 32px; border-radius: 9px; font-size: 15px; flex:none; margin-top: 1px; }
-  .topbar-title{ min-width: 0; }
+  .topbar-title{ min-width: 0; flex: 1 1 auto; }
   .event-name{ font-size: 21px; color: var(--cream); line-height:1.2; overflow-wrap: break-word; }
   .event-datetime{ font-size: 11.5px; color: var(--pale); margin-top: 2px; font-weight: 600; font-family:'Quicksand',sans-serif; }
-  .topbar-right{ display:flex; align-items:center; gap: 8px; flex:none; }
+  .topbar-right{ display:flex; align-items:center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
   .profit-pill{ background: rgba(255,255,255,0.14); border-radius: 999px; padding: 7px 12px; display:flex; align-items:center; gap: 6px; }
   .profit-pill .lbl{ font-size: 10px; text-transform:uppercase; letter-spacing:0.05em; color: var(--pale); font-weight:700; font-family:'Quicksand',sans-serif; }
   .profit-pill .val{ font-family:'Quicksand',sans-serif; font-weight:700; font-size: 15px; }

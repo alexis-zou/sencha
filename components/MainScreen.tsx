@@ -28,7 +28,7 @@ export default function MainScreen() {
           <button className="home-btn" onClick={goHome}>
             ←
           </button>
-          <div>
+          <div className="topbar-title">
             <h1 className="event-name">{activeEvent.eventName}</h1>
             <div className="event-datetime">{formatEventDateTime(activeEvent)}</div>
           </div>

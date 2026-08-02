@@ -152,7 +152,7 @@ export default function OrderPanel({
           Cancel
         </button>
         <button className="confirm-btn" ref={confirmBtnRef} onClick={handleConfirmOrder}>
-          {editingOrder ? 'Save changes' : 'Add to list'}
+          {editingOrder ? 'Save changes' : 'Confirm order'}
         </button>
       </div>
 

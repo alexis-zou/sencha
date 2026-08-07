@@ -78,8 +78,8 @@ interface AppStateValue {
 
   // Orders live in Supabase now (see lib/supabase/orders.ts) -- these are
   // the only way to mutate an order (see OrdersPage.tsx).
-  addOrder: (note: string, items: OrderLineItem[]) => Promise<void>;
-  editOrder: (orderId: string, note: string, items: OrderLineItem[]) => Promise<void>;
+  addOrder: (note: string, items: OrderLineItem[], customerPhone: string) => Promise<void>;
+  editOrder: (orderId: string, note: string, items: OrderLineItem[], customerPhone: string) => Promise<void>;
   toggleOrderDone: (orderId: string) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
 
@@ -429,13 +429,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   // it's confirmed would be wrong (e.g. navigating into an event that
   // turns out not to have been created).
 
-  async function addOrder(note: string, items: OrderLineItem[]) {
+  async function addOrder(note: string, items: OrderLineItem[], customerPhone: string) {
     if (!activeEventId || !currentUserId) return;
     const eventId = activeEventId;
     const tempId = `temp-${uid()}`;
-    applyOrdersUpdate(eventId, (orders) => [...orders, { id: tempId, note, done: false, ts: Date.now(), items }]);
+    applyOrdersUpdate(eventId, (orders) => [
+      ...orders,
+      { id: tempId, note, done: false, ts: Date.now(), items, customerPhone: customerPhone || undefined },
+    ]);
     try {
-      const newOrder = await createOrderRemote(supabase, currentUserId, eventId, note, items);
+      const newOrder = await createOrderRemote(supabase, currentUserId, eventId, note, items, customerPhone);
       applyOrdersUpdate(eventId, (orders) => {
         const withoutTemp = orders.filter((o) => o.id !== tempId);
         // The realtime echo of this same insert can land before this
@@ -449,13 +452,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function editOrder(orderId: string, note: string, items: OrderLineItem[]) {
+  async function editOrder(orderId: string, note: string, items: OrderLineItem[], customerPhone: string) {
     if (!activeEventId) return;
     const eventId = activeEventId;
     const previous = (ordersByEvent[eventId] || []).find((o) => o.id === orderId);
-    applyOrdersUpdate(eventId, (orders) => orders.map((o) => (o.id === orderId ? { ...o, note, items } : o)));
+    applyOrdersUpdate(eventId, (orders) =>
+      orders.map((o) => (o.id === orderId ? { ...o, note, items, customerPhone: customerPhone || undefined } : o))
+    );
     try {
-      await updateOrderRemote(supabase, orderId, note, items);
+      await updateOrderRemote(supabase, orderId, note, items, customerPhone);
     } catch (err) {
       if (previous) {
         applyOrdersUpdate(eventId, (orders) => orders.map((o) => (o.id === orderId ? previous : o)));

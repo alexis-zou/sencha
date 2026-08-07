@@ -34,8 +34,9 @@ All colors are matcha/earth tones — no arbitrary "brand blue" or unrelated acc
 
 - **Headings** (`h1`, `h2`, `h3`, `.display` class): **Patrick Hand** — a neat, legible handwriting font. Chosen specifically over more scrawly/cursive options (e.g. Caveat) because it needs to stay readable at small sizes on a phone screen, not just decorative.
 - **Body/UI text**: **Quicksand** — a clean, geometric, rounded sans-serif. Used for everything else: labels, buttons, numbers, form inputs, badges.
+- **Brand wordmark only**: **Cormorant Garamond** (weight 600) — a thin, high-waisted serif, matching the actual source logo artwork. Scoped narrowly to `.brand-wordmark` (the "sencha" logotype on the landing/auth screens) — not a second UI display font; every other heading stays Patrick Hand. See `DECISIONS.md` for why this is exempt from the "no second display font" rule below.
 - **Why the split:** handwritten type everywhere would hurt legibility (numbers especially); clean type everywhere would lose the scrapbook warmth. The split puts personality where it's decorative (headings, names) and clarity where it's functional (numbers, prices, form fields).
-- Both are loaded via Google Fonts `@import` in `globals.css` — no local font files are bundled.
+- All three are loaded via Google Fonts `@import` in `globals.css` — no local font files are bundled.
 
 **Rule:** numeric/data displays (prices, inventory badges, income figures) should always use Quicksand, never Patrick Hand — legibility of numbers under time pressure matters more than thematic consistency there.
 
@@ -66,7 +67,7 @@ All colors are matcha/earth tones — no arbitrary "brand blue" or unrelated acc
 ### 5. Postcards, receipts, and folders (the "correspondence" family)
 - The live Event Summary tab is a **postcard** (`.postcard`): kraft texture, a corner "stamp" emoji, a 2×2 stat grid, dashed dividers.
 - An ended event's summary is a **receipt** (`.receipt`): itemized dotted-leader lines, a total, and a decorative (non-scannable — see `DECISIONS.md`) barcode footer.
-- Home-screen events are **file folders** (`.event-folder`): a small tab shape above a rounded card; opening one "retrieves" the receipt.
+- Home-screen events are **file folders** (`.event-folder`): a two-tone back/front card (a colored `--light` "back" showing as a peeking tab and a top band, with a `--paper` "front" inset inside it, soft inner sheen, and a real lifted drop shadow) rather than a flat card with a decorative notch — reads as an actual manila folder. Opening one "retrieves" the receipt.
 - These three reinforce the same "warm, handmade correspondence" idea from three different real-world paper objects — keep new event-related surfaces drawing from this same object vocabulary rather than inventing an unrelated fourth metaphor.
 
 ### 5. Translucent bottom navigation
@@ -89,6 +90,8 @@ All colors are matcha/earth tones — no arbitrary "brand blue" or unrelated acc
 - **Modal sheets** (`ItemPickerModal`, `SettingsModal`) slide up from the bottom, full-width, rounded top corners only — consistent "bottom sheet" pattern for anything that's a focused sub-task within a larger flow. Don't introduce a second modal style (e.g. centered dialog) without a clear reason.
 - **Empty states** always pair a short handwritten-font headline with one clarifying sentence in body text (see `.empty-state .display` + regular text) — e.g. "All caught up / No pending orders — add one above when the next customer orders." Every list in the app (events, pending orders, completed orders) should have one; don't ship a list that can just render blank.
 - **Status badges** (Active/Ended) use filled pill shapes with the palette's semantic colors (sage = good, pale = neutral/past). Inventory status uses a two-step scale instead (sage = plenty, `--danger-light` soft red = low under 10, full `--danger` = out) — no amber step. Keep whichever mapping you're extending consistent with its own scale rather than mixing the two.
+- **"Juicy" 3D buttons**: every primary action button gets a bottom-rim `box-shadow` (a darker shade of its own background) reading as physical depth, and translates down + flattens its shadow on `:active` rather than just scaling down. Any new primary CTA should follow this, not a flat/scale-only press state.
+- **Bell + toast, for anything "live"**: real-time updates (a teammate's order change) surface two ways at once — a persistent unread badge on `NotificationBell` (for catching up later) and a transient, auto-dismissing, stacking toast via `ToastHost` (for noticing right now, wherever you are in the app). If a future feature needs to surface a live cross-user event, reuse this pair rather than inventing a third notification mechanism.
 
 ---
 

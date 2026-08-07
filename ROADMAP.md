@@ -17,14 +17,14 @@ These are pure functions (no React, no DOM) — the highest-value, lowest-effort
 ### 3. Add basic e2e smoke test for the core loop
 Sign up → create event → add a multi-item order with a drink customization → mark it done → check income and inventory updated correctly → end event → view read-only summary. Playwright is already available in the current dev environment's global tooling.
 
-### 4. Decide on a real backend
-Spike/decide: managed Postgres + an ORM (Prisma or Drizzle) is the natural fit given the relational schema sketched in `CLAUDE.md` § 7. Auth can either be hand-rolled against that database or use a managed auth provider — worth weighing given this is a small, personal-use app where "roll your own" may genuinely be simpler than integrating a third-party auth service.
+### 4. ~~Decide on a real backend~~ — Done (V11)
+Built on Supabase (hosted Postgres + Auth + Realtime), not the hand-rolled Postgres + Prisma/Drizzle approach this entry originally sketched — see `DECISIONS.md` for why Supabase specifically. `CLAUDE.md` § 7 has the deployed schema.
 
-### 5. Migrate authentication to the real backend
-Replace the plaintext `auth:users`/`auth:session` localStorage scheme with real hashed-password storage and real sessions (e.g. HTTP-only cookies). This is the single most important item on this list from a "don't ship something that looks like an account system but isn't one" standpoint — see `DECISIONS.md`'s hard-line note on this.
+### 5. ~~Migrate authentication to the real backend~~ — Done (V11)
+Real Supabase Auth (hashed passwords, real sessions, email confirmation) replaced the plaintext `auth:users`/`auth:session` localStorage scheme. See `CHANGELOG.md` V11 and `DECISIONS.md`'s "Local-only, prototype-level authentication" entry (now superseded).
 
-### 6. Migrate event/order persistence to the real backend
-Move `events: PopupEvent[]` from localStorage to the database, scoped by real user IDs. Keep `lib/storage.ts`'s `get/set/delete` shape as the contract if practical, or replace it with typed API-calling functions — either way, component code should need minimal changes since it already goes through `AppStateContext`, not storage directly.
+### 6. ~~Migrate event/order persistence to the real backend~~ — Done (V11)
+Events, Inventory, Settings, and Orders all read/write Supabase now, scoped by real user IDs via Row Level Security. `lib/storage.ts`'s `get/set/delete` shape was kept as-is and now only serves the reusable menu template — component code needed minimal changes since it already went through `AppStateContext`, not storage directly, exactly as this entry anticipated.
 
 ### 7. Add a delete-order confirmation
 Currently 🗑 removes an order instantly with no undo. A lightweight native `confirm()` (consistent with the End Event / stock-warning pattern already in the app) is enough — no need for a custom modal.
@@ -62,11 +62,32 @@ Keyboard navigation through the order panel/item picker, `aria-label`s on icon-o
 ### 18. Add offline resilience messaging
 Once there's a real backend (#6), decide what happens if a stand's wifi/data drops mid-market — likely want an optimistic-UI + retry-queue approach given the "never lose data mid-rush" product principle, plus a visible "offline, will sync" indicator so the user isn't left guessing.
 
-### 19. Multi-user / shared-stand support
-Let two people working one physical stand both add/complete orders live and see each other's changes. Requires the backend (#6) plus either polling or a real-time layer (e.g. WebSockets/a service like Pusher/Ably) — a genuinely bigger lift, sequenced late deliberately.
+### 19. ~~Multi-user / shared-stand support~~ — Done (V11.1–V11.2)
+Invite-by-email + shared `event_members` access (`CHANGELOG.md` V11.1) plus Supabase Realtime for live order sync and in-app notifications (V11.2). Landed sooner than this list's original sequencing expected, once the backend (#6) existed. Not yet verified against two real signed-in accounts live — see #21 below.
 
 ### 20. Visual/design system pass (Tailwind or equivalent)
 Per `DECISIONS.md`, plain CSS was a deliberate choice for the initial port to minimize conversion risk. Once the port is verified (#1) and the team has room to invest in it, revisit whether to formalize the design tokens in `DESIGN.md` into a proper system (Tailwind config, or a small internal component library) — do this as its own dedicated task with before/after visual review, not bundled into a feature change.
+
+---
+
+## Newly Surfaced (post-V11)
+
+Follow-ups that came directly out of building the Supabase migration — smaller and more concrete than the numbered list above, worth doing soon:
+
+### 21. Remove the live `TEMPORARY DEBUG` code
+`context/AppStateContext.tsx`'s `debugWhoAmI()` and the matching branch in `components/SetupScreen.tsx`'s create-event error handler were added to diagnose the `event_members` RLS recursion bug (`CHANGELOG.md` V11.4). The bug is fixed; this diagnostic wasn't removed. Take out both, and drop the `debug_whoami()` function from the database. See `CLAUDE.md` § 11 #9.
+
+### 22. Decide on `supabase/undo_rls_hardening_phase.sql`
+Drafted but not committed or run — reverts `rls_hardening_phase.sql`'s `notifications` policy change specifically. Needs a decision: run it, or discard the file. See `CLAUDE.md` § 11 #10.
+
+### 23. Reconcile or remove `supabase/schema.sql`
+It's an early design proposal that was never deployed as written and now meaningfully diverges from the real schema (column names, RLS model, when things were added). Either update it to match the phase-file reality, or delete it so it stops reading as current documentation. See `CLAUDE.md` § 7/§ 11 #7.
+
+### 24. Add a foreign key from `orders.event_id` to `events.id`
+A known loose end since Orders and Events migrated to Supabase in separate phases before either table referenced the other. Needs a data-cleanliness check first (any non-UUID or orphaned `event_id` values) before the constraint can be added safely. See `CLAUDE.md` § 11 #8.
+
+### 25. Verify the collaboration/Realtime/notifications flows against two real accounts
+Every session that built invite-by-email, live order sync, and in-app notifications (V11.1–V11.2) was blocked by Supabase's signup rate limit before live multi-account testing was possible. Structurally sound (`tsc` clean, builds clean) but not yet confirmed with two real signed-in users on a shared event. See `CLAUDE.md` § 11 #6.
 
 ---
 

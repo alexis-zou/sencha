@@ -40,6 +40,10 @@ export interface Order {
   note: string; // customer name / table, shown as the ticket header
   done: boolean;
   ts: number; // Date.now() at creation, used for sort order
+  // Optional, entered at order time. When present, checking this order
+  // off prompts staff to send a pickup-ready text -- see lib/sms.ts and
+  // OrdersPage.tsx's handleToggleDone.
+  customerPhone?: string;
 }
 
 // Starting stock per menu item (drinks + additional items only — syrup and

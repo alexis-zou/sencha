@@ -13,6 +13,7 @@ interface OrderRow {
   note: string;
   done: boolean;
   ts: number | string;
+  customer_phone: string | null;
 }
 
 // `ts` is `bigint` in Postgres -- like `numeric`, PostgREST can hand this
@@ -21,7 +22,14 @@ interface OrderRow {
 // Order.ts is declared `number` and used for sort math (a.ts - b.ts), so
 // every row read has to coerce it explicitly rather than trust the type.
 function toOrder(row: OrderRow, items: OrderLineItem[]): Order {
-  return { id: row.id, note: row.note, done: row.done, ts: Number(row.ts), items };
+  return {
+    id: row.id,
+    note: row.note,
+    done: row.done,
+    ts: Number(row.ts),
+    items,
+    customerPhone: row.customer_phone || undefined,
+  };
 }
 
 interface OrderItemRow {
@@ -88,7 +96,7 @@ function toItemRows(orderId: string, items: OrderLineItem[]) {
 export async function fetchOrdersByEvent(supabase: SupabaseClient): Promise<Record<string, Order[]>> {
   const { data: orderRows, error: ordersErr } = await supabase
     .from('orders')
-    .select('id, event_id, note, done, ts');
+    .select('id, event_id, note, done, ts, customer_phone');
   if (ordersErr || !orderRows) return {};
 
   const orderIds = orderRows.map((o) => o.id);
@@ -115,13 +123,14 @@ export async function createOrder(
   userId: string,
   eventId: string,
   note: string,
-  items: OrderLineItem[]
+  items: OrderLineItem[],
+  customerPhone: string
 ): Promise<Order> {
   const ts = Date.now();
   const { data: orderRow, error } = await supabase
     .from('orders')
-    .insert({ event_id: eventId, user_id: userId, note, done: false, ts })
-    .select('id, event_id, note, done, ts')
+    .insert({ event_id: eventId, user_id: userId, note, done: false, ts, customer_phone: customerPhone || null })
+    .select('id, event_id, note, done, ts, customer_phone')
     .single();
   if (error || !orderRow) throw error || new Error('Failed to create order');
 
@@ -140,9 +149,13 @@ export async function updateOrder(
   supabase: SupabaseClient,
   orderId: string,
   note: string,
-  items: OrderLineItem[]
+  items: OrderLineItem[],
+  customerPhone: string
 ): Promise<void> {
-  const { error } = await supabase.from('orders').update({ note }).eq('id', orderId);
+  const { error } = await supabase
+    .from('orders')
+    .update({ note, customer_phone: customerPhone || null })
+    .eq('id', orderId);
   if (error) throw error;
 
   const { error: delErr } = await supabase.from('order_items').delete().eq('order_id', orderId);

@@ -1,0 +1,25 @@
+-- ============================================================
+-- Sencha -- Customer pickup-text phase
+--
+-- Adds an optional customer_phone column to orders, captured at order
+-- time in OrderPanel.tsx. No new table, no RLS change, no server-side
+-- trigger, no third-party API/secrets -- the actual text is sent from
+-- a team member's own phone via an `sms:` link (built in lib/sms.ts,
+-- fired from OrdersPage.tsx's handleToggleDone), which the browser
+-- can only open a compose screen for -- it cannot send on its own, a
+-- person still has to confirm and tap Send. This column exists purely
+-- so the number survives a reload and syncs to whichever teammate's
+-- device ends up checking the order off, the same way every other
+-- order field already does (see lib/supabase/orders.ts).
+--
+-- No format validation/constraint on the value: it's stored exactly
+-- as typed (matching how `note` already has zero validation) and only
+-- cleaned up (stripped to digits/+) at the point an sms: link is
+-- built, so what's displayed always matches what staff actually typed.
+--
+-- No RLS policy change needed: "members can access orders" (see
+-- fix_event_members_recursion.sql) already governs every column on
+-- this table, not just the ones that existed when it was written.
+-- ============================================================
+
+alter table public.orders add column customer_phone text;

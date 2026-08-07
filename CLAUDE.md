@@ -135,6 +135,7 @@ Setup is a **wizard** (`components/SetupScreen.tsx`), navigated only via explici
 - **Sparkle animation**: confirming a new/edited order (the "Add to list" / "Save changes" button) triggers a sparkle burst (✨ ⭐ 🌟).
 - Deleting an order (🗑) removes it immediately (no confirmation currently — see § 11 known gaps).
 - **In-flight protection**: while a toggle/delete for a specific order is still in flight against Supabase, that order's own checkbox/delete button disables (`busy` state) so a slow connection can't double-fire the same mutation.
+- **Optional customer pickup text**: a phone number field under name/table in `OrderPanel.tsx`. If set, checking that order off prompts staff (via `confirm()`) to text the customer; confirming opens an `sms:` link in the browser's native Messages app, pre-filled with a pickup-ready message, one tap from sending. Not an automated/API-backed send — see `DECISIONS.md` and `CHANGELOG.md` V12 for why, and § 7 for the schema change.
 
 ### Inventory
 - Dedicated Inventory tab (bottom nav) showing **one card per menu item** (drinks + additional items — generalized from the old fixed matcha/bread/cookie trio, so a stand can track any number/kind of products).
@@ -228,6 +229,7 @@ interface MenuTemplate { menu: MenuItem[]; syrups: FlavorOption[]; milks: Flavor
 5. **`realtime_phase.sql`** — adds `orders` to the Realtime publication.
 6. **`fix_event_members_recursion.sql`** — fixes a real production bug (see below); introduces `is_event_member()`, now the standard way every policy checks membership.
 7. **`rls_hardening_phase.sql`** — an audit pass on top of the (buggy, at the time) collaborative policies: makes `to authenticated` and `revoke ... from anon` explicit everywhere. Also carried the recursion bug forward unchanged (fixed in #6); its `notifications` change was partially reverted by an uncommitted `undo_rls_hardening_phase.sql` — see § 11 #10.
+8. **`customer_sms_phase.sql`** — adds a nullable `orders.customer_phone`. No RLS change (the existing membership policy already covers every column), no trigger, no third-party API — see § 5 "Optional customer pickup text" and `CHANGELOG.md` V12 for why this one deliberately isn't server-driven like everything else in this list.
 
 The live shape, in short:
 ```
@@ -237,7 +239,7 @@ public.event_members    event_id, user_id, role ('owner' | 'staff')   -- the RLS
 public.menu_items       id, event_id, name, price, type, sort_order
 public.inventory        menu_item_id (PK, FK), starting_count
 public.flavor_options   id, event_id, kind ('syrup' | 'milk'), name, price, sort_order
-public.orders           id, event_id (text, no FK yet), user_id, note, done, ts, created_at
+public.orders           id, event_id (text, no FK yet), user_id, note, done, ts, created_at, customer_phone
 public.order_items      id, order_id, item_id, item_name, price, qty, syrup_*, milk_*   -- name/price snapshotted
 public.notifications    id, user_id, event_id, type, payload (jsonb), is_read, created_at   -- insert-only via trigger
 ```
@@ -415,6 +417,7 @@ sencha_app/
 │   ├── calculations.ts       # pure business logic (see § 10)
 │   ├── storage.ts             # localStorage wrapper (now just the menu template)
 │   ├── id.ts                  # uid() generator (temp/optimistic ids only)
+│   ├── sms.ts                  # builds the sms: link for the pickup-ready text
 │   └── supabase/
 │       ├── client.ts          # browser Supabase client
 │       ├── server.ts          # server-component Supabase client
@@ -432,7 +435,8 @@ sencha_app/
     ├── realtime_phase.sql
     ├── fix_event_members_recursion.sql    # fixes the RLS recursion bug — see § 7
     ├── rls_hardening_phase.sql
-    └── undo_rls_hardening_phase.sql       # uncommitted, partial revert — see § 11 #10
+    ├── undo_rls_hardening_phase.sql       # uncommitted, partial revert — see § 11 #10
+    └── customer_sms_phase.sql             # orders.customer_phone — see § 5/§ 7
 ```
 
 **As the app grows**, the recommended next structural moves (see `ROADMAP.md` for when):

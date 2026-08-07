@@ -15,9 +15,10 @@ export default function OrderPanel({
   event: PopupEvent;
   editingOrder: Order | null;
   onCancel: () => void;
-  onSave: (note: string, items: OrderLineItem[]) => void;
+  onSave: (note: string, items: OrderLineItem[], customerPhone: string) => void;
 }) {
   const [note, setNote] = useState(editingOrder ? editingOrder.note : '');
+  const [phone, setPhone] = useState(editingOrder?.customerPhone ?? '');
   const [items, setItems] = useState<OrderLineItem[]>(editingOrder ? editingOrder.items.map((it) => ({ ...it })) : []);
   const [error, setError] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -73,7 +74,7 @@ export default function OrderPanel({
       if (!proceed) return;
     }
     burstEffect(confirmBtnRef.current, ['✨', '⭐', '🌟']);
-    onSave(note.trim(), items);
+    onSave(note.trim(), items, phone.trim());
   }
 
   return (
@@ -91,6 +92,17 @@ export default function OrderPanel({
           placeholder="e.g. Sarah, Table 4"
           value={note}
           onChange={(e) => setNote(e.target.value)}
+        />
+      </div>
+
+      <div className="field-group">
+        <label className="field-label">Phone number (optional)</label>
+        <input
+          className="text-input"
+          type="tel"
+          placeholder="For a pickup-ready text — leave blank to skip"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
         />
       </div>
 

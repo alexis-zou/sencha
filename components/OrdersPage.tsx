@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useAppState } from '@/context/AppStateContext';
 import { Order, OrderLineItem } from '@/lib/types';
+import { buildPickupReadySmsUrl } from '@/lib/sms';
 import TicketCard from './TicketCard';
 import OrderPanel from './OrderPanel';
 
@@ -44,13 +45,13 @@ export default function OrdersPage() {
     setEditingOrder(null);
   }
 
-  async function handleSaveOrder(note: string, items: OrderLineItem[]) {
+  async function handleSaveOrder(note: string, items: OrderLineItem[], customerPhone: string) {
     try {
       setError('');
       if (editingOrder) {
-        await editOrder(editingOrder.id, note, items);
+        await editOrder(editingOrder.id, note, items, customerPhone);
       } else {
-        await addOrder(note, items);
+        await addOrder(note, items, customerPhone);
       }
       closePanel();
     } catch {
@@ -60,9 +61,22 @@ export default function OrdersPage() {
 
   async function handleToggleDone(id: string) {
     setError('');
+    // Captured before the toggle so we know whether this tap is
+    // completing the order (not un-checking it) once the write
+    // succeeds -- only a fresh completion should ever prompt to text.
+    const order = orders?.find((o) => o.id === id);
+    const willComplete = !!order && !order.done;
     setBusyIds((prev) => new Set(prev).add(id));
     try {
       await toggleOrderDone(id);
+      if (willComplete && order?.customerPhone && activeEvent) {
+        const wantsText = window.confirm(
+          `Text ${order.note || 'the customer'} to let them know their order is ready?`
+        );
+        if (wantsText) {
+          window.location.href = buildPickupReadySmsUrl(order.customerPhone, activeEvent.eventName);
+        }
+      }
     } catch {
       setError('Could not update that order — check your connection and try again.');
     } finally {

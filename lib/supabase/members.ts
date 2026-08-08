@@ -2,7 +2,7 @@
 // (see supabase/collaboration_phase.sql). This is the only place that
 // knows about the public.users/event_members table shape.
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js';
 
 export interface EventMember {
   userId: string;
@@ -70,4 +70,28 @@ export async function inviteMember(supabase: SupabaseClient, eventId: string, em
   }
 
   return { userId: userRow.id, email: userRow.email, role: 'staff' };
+}
+
+// Fires when the signed-in user is added to an event's roster --
+// including a fresh invite from Settings on an event that already
+// existed, not just at event creation. See
+// supabase/realtime_event_members_phase.sql: unlike orders/notifications,
+// this doesn't carry enough to build a full PopupEvent on its own (no
+// menu/inventory in this row), so the caller's job is just to know
+// "something changed, go re-fetch" -- not to assemble the event itself.
+export function subscribeToMembership(supabase: SupabaseClient, userId: string, onNewMembership: () => void): () => void {
+  const channel = supabase
+    .channel(`event_members:${userId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'event_members', filter: `user_id=eq.${userId}` },
+      (_payload: RealtimePostgresChangesPayload<{ event_id: string; user_id: string }>) => {
+        onNewMembership();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

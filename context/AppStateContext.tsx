@@ -21,6 +21,7 @@ import {
   fetchMembers,
   inviteMember as inviteMemberRemote,
   checkEmailRegistered as checkEmailRegisteredRemote,
+  subscribeToMembership,
   EventMember,
 } from '@/lib/supabase/members';
 import {
@@ -139,16 +140,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setOrdersByEvent((prev) => ({ ...prev, [eventId]: updater(prev[eventId] || []) }));
   }
 
+  // Shared by the initial bootstrap and by the membership-realtime
+  // handler below -- both need "re-fetch the full events list plus
+  // every event's orders," just triggered differently.
+  async function refreshEventsAndOrders() {
+    const [loadedEvents, grouped] = await Promise.all([fetchEvents(supabase), fetchOrdersByEvent(supabase)]);
+    setEvents(loadedEvents);
+    setOrdersByEvent(grouped);
+  }
+
   async function loadUserInto(email: string, userId: string) {
     setCurrentUser(email);
     setCurrentUserId(userId);
-    const [loadedEvents, grouped, loadedNotifications] = await Promise.all([
-      fetchEvents(supabase),
-      fetchOrdersByEvent(supabase),
-      fetchNotifications(supabase, userId),
-    ]);
-    setEvents(loadedEvents);
-    setOrdersByEvent(grouped);
+    const [, loadedNotifications] = await Promise.all([refreshEventsAndOrders(), fetchNotifications(supabase, userId)]);
     setNotifications(loadedNotifications);
     setView((v) => (v === 'setup' || v === 'main' || v === 'summary' ? v : 'home'));
   }
@@ -219,6 +223,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const unsubscribe = subscribeToNotifications(supabase, currentUserId, (n) => {
       setNotifications((prev) => [n, ...prev]);
       setToasts((prev) => [...prev, n]);
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+
+  // ---- live membership: being added to an event's roster -- including
+  // an invite from Settings on an event that already existed, not just
+  // at creation -- previously never showed up on Home until the next
+  // sign-in, since `events` is otherwise only fetched once at bootstrap.
+  // A membership row alone isn't enough to build a full PopupEvent (no
+  // menu/inventory on it), so this just re-fetches everything rather
+  // than trying to assemble the one new event by hand.
+  useEffect(() => {
+    if (!currentUserId) return;
+    const unsubscribe = subscribeToMembership(supabase, currentUserId, () => {
+      refreshEventsAndOrders();
     });
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps

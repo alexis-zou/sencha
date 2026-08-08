@@ -1,0 +1,28 @@
+-- ============================================================
+-- Sencha -- Realtime phase 2: event_members
+--
+-- Bug: inviting someone to an event from Settings (after the event
+-- already exists) never showed up on the invited person's Home
+-- screen. `events` is only fetched once, in loadUserInto, driven by
+-- Supabase's onAuthStateChange firing at sign-in -- there was no
+-- mechanism to notice "you were just added to a new event" while
+-- already signed in. Notifications worked fine regardless, since
+-- that's a separate live subscription that doesn't depend on the
+-- event being in local state at all -- only the Home screen's own
+-- event list was stale.
+--
+-- Fix (client side, see lib/supabase/members.ts's subscribeToMembership
+-- and AppStateContext.tsx): subscribe to INSERTs on event_members
+-- filtered to the signed-in user's own rows, and re-fetch events +
+-- orders when one arrives. This migration is what makes that
+-- subscription possible -- same pattern as realtime_phase.sql for
+-- orders, just for event_members instead.
+--
+-- RLS still applies to Realtime the same as any other read: the row
+-- being inserted (event_id, user_id = the invited person) satisfies
+-- "members can view their event's roster" immediately (it's their
+-- own membership row), so they receive it the moment the owner's
+-- invite lands -- no separate policy change needed here either.
+-- ============================================================
+
+alter publication supabase_realtime add table public.event_members;

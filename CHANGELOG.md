@@ -448,3 +448,11 @@ The menu, syrup list, and milk list were locked in at setup — the only stated-
 **Confirmed safe for past orders**, per the original roadmap entry's own watch-out: `order_items` denormalizes `item_name`/`price` at order time and isn't touched by this sync at all (`orders.item_id` also isn't a foreign key — see `orders_phase.sql`), so renaming or repricing a menu item, or deleting it entirely, never changes what an already-placed order displays.
 
 No RLS changes needed — `menu_items`/`flavor_options`/`inventory`'s existing "members can access" policies (`for all`) already cover insert/update/delete, not just the select/insert-at-creation paths that had been exercised so far.
+
+---
+
+## V12.2 — Fix: a mid-event invite never appeared on the invited person's Home screen (2026-08-08)
+
+**The bug:** inviting someone from Settings, on an event that already existed, added them to `event_members` correctly (they'd get order notifications for that event right away), but the event itself never showed up as a stand on their Home screen — only a fresh sign-in would surface it. Root cause: `events` is fetched exactly once, in `loadUserInto`, triggered by Supabase's `onAuthStateChange` firing at sign-in. Nothing re-fetched it afterward, so an invited person's local `events` state was simply a stale snapshot from whenever they last logged in — unlike notifications, which are their own always-on Realtime subscription that doesn't depend on the event being in local state at all.
+
+**The fix:** `supabase/realtime_event_members_phase.sql` adds `event_members` to the Realtime publication (same mechanism `realtime_phase.sql` already uses for `orders`). `lib/supabase/members.ts`'s new `subscribeToMembership(supabase, userId, onNewMembership)` listens for `INSERT`s on `event_members` filtered to the signed-in user's own rows; `AppStateContext.tsx` reacts by re-fetching events + orders (extracted the bootstrap's fetch-and-set logic into a shared `refreshEventsAndOrders()`, now called from both `loadUserInto` and this new subscription). A membership row alone doesn't carry a menu/inventory to build a full `PopupEvent` from, so this re-fetches everything rather than trying to assemble the one new event by hand — simple and correct at this app's scale, where being invited to a new stand is a rare event, not a frequent one like an order changing.

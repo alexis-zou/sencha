@@ -340,7 +340,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   async function updateEventSettings(patch: EventSettingsPatch) {
     if (!activeEventId) return;
-    await updateEventSettingsRemote(supabase, activeEventId, patch);
+    const current = events.find((e) => e.id === activeEventId);
+    if (!current) return;
+    const result = await updateEventSettingsRemote(supabase, activeEventId, patch, current);
     setEvents((prev) =>
       prev.map((e) => {
         if (e.id !== activeEventId) return e;
@@ -349,7 +351,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (patch.eventDate !== undefined) next.eventDate = patch.eventDate;
         if (patch.startTime !== undefined) next.startTime = patch.startTime;
         if (patch.endTime !== undefined) next.endTime = patch.endTime;
-        if (patch.inventory) next.inventory = { ...e.inventory, ...patch.inventory };
+        // Menu/inventory/syrups/milks come back from the server with
+        // real ids (new rows only had a client-side temp id going in),
+        // so these replace rather than merge into the previous state.
+        if (result.menu) next.menu = result.menu;
+        if (result.inventory) next.inventory = result.inventory;
+        else if (patch.inventory) next.inventory = { ...e.inventory, ...patch.inventory };
+        if (result.syrups) next.syrups = result.syrups;
+        if (result.milks) next.milks = result.milks;
         return next;
       })
     );

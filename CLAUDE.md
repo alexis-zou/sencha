@@ -153,7 +153,7 @@ Setup is a **wizard** (`components/SetupScreen.tsx`), navigated only via explici
 - All figures come from `lib/calculations.ts`'s `computeEventStats()`, which aggregates completed orders only — consistent with how Income is already calculated, so a pending order-in-progress doesn't inflate "what actually sold" figures.
 
 ### Settings & lifecycle
-- ⚙ Settings modal (from the active event's top bar) lets you edit event name, date/time, team membership (see "Collaboration" above), and starting inventory counts (one row per menu item) after the fact.
+- ⚙ Settings modal (from the active event's top bar) lets you edit event name, date/time, team membership (see "Collaboration" above), starting inventory counts, and — as of V12.1 — the menu itself: add, rename, reprice, or remove Drinks/Syrup/Milk/Additional items after the event has started, same row-editor UX as the setup wizard's menu page. Removing or repricing an item never changes how it displays on orders already placed (line items denormalize their own name/price at order time).
 - "End Event" (red button, top bar) confirms, marks the event `ended`, and returns to Home.
 - Ended events become **read-only**: a dedicated Summary screen (`SummaryScreen.tsx`) presents the event as a **receipt** — itemized line items with dotted leaders, a total, order-completion counts, top syrup/milk, a decorative barcode (`icons/Barcode.tsx`, deterministic per event id, not a real scannable symbology), final inventory (via the same cute icons/progress bars), and every order as a non-interactive ticket below. An **"🖨️ Export as PDF"** button triggers the browser's native print dialog against a dedicated print stylesheet that hides app chrome and shows just the receipt + inventory — "Save as PDF" from that dialog is the export path (no PDF-generation library was added; see `DECISIONS.md`).
 
@@ -176,8 +176,8 @@ Setup is a **wizard** (`components/SetupScreen.tsx`), navigated only via explici
 See `ROADMAP.md` for the prioritized, numbered version of this list. Summary:
 
 - ~~Real backend + database (multi-device sync, real authentication, multi-user collaboration)~~ — **done**, see § 4/§ 5 and `CHANGELOG.md` V11–V11.4.
+- ~~Editing the menu/add-ons/syrup list after an event has started~~ — **done**, see § 5 "Settings & lifecycle" and `CHANGELOG.md` V12.1.
 - Ingredient-cost input for true profit margin (currently revenue-only).
-- Editing the menu/add-ons/syrup list **after** an event has started (currently locked in at setup).
 - Duplicating/"templating" a past event to reuse a menu + prices for a recurring market.
 - Password reset UI — Supabase Auth supports recovery natively now that accounts are real, but no "forgot password" flow has been built in the app yet.
 - Reordering/duplicating a line item within the order panel.
@@ -287,7 +287,7 @@ All components are under `components/` (one file per component, PascalCase). Qui
 | `OrderPanel` | New/edit order form styled as a handwritten order sheet: note field, draft item list, "+ Add item," stock warning, confirm |
 | `ItemPickerModal` | Modal for choosing a menu item + configuring syrup/milk + quantity |
 | `TicketCard` | The receipt-style order card, used in both `OrdersPage` and `SummaryScreen` (via a `readonly` prop) |
-| `SettingsModal` | Edit event name/date/team membership/inventory after setup |
+| `SettingsModal` | Edit event name/date/team membership/inventory/**menu** after setup |
 | `NotificationBell` | Unread-count badge + dropdown over live in-app notifications |
 | `ToastHost` | Auto-dismissing, stacking toast queue for live notifications, mounted once in `AppShell` |
 | `LoadingScreen` | Branded pulsing icon shown during the initial session/data bootstrap (respects `prefers-reduced-motion`) |
@@ -323,7 +323,7 @@ Nothing here is *currently* a confirmed broken-behavior bug in production (the r
 1. **No in-app password reset flow.** Supabase Auth supports password recovery natively now that accounts are real (see § 4), but no "forgot password" UI has been built to trigger it yet — a forgotten password still has no recovery path from inside the app today.
 2. ~~`localStorage` is per-browser, per-device.~~ **Resolved for accounts, events, and orders** — all three now live in Postgres and sync across devices/browsers via Supabase Auth + Realtime (`CHANGELOG.md` V11). The one thing still local-only is the reusable **menu template**, a low-stakes convenience feature, not core data.
 3. **No delete confirmation on orders.** Tapping 🗑 removes an order immediately, no undo.
-4. **Menu/add-ons/syrups are locked at setup.** If a stand realizes mid-event they need to rename or reprice something, there's no in-event edit path (only team membership, the inventory counts, and event name/date are editable via Settings).
+4. ~~Menu/add-ons/syrups are locked at setup.~~ **Resolved (V12.1).** `SettingsModal` now has a full add/rename/reprice/remove editor for the menu, syrup, and milk lists, in addition to team membership, inventory counts, and event name/date.
 5. ~~Auth is not secure.~~ **Resolved.** Real Supabase Auth (hashed passwords, real sessions, email confirmation) replaced the plaintext `localStorage` password map in V11. Data access for everything else now runs through Postgres Row Level Security (§ 7), not any application-level check.
 6. **No automated tests exist yet.** Manual verification (`tsc --noEmit`, production build, click-through) is the only validation method used so far. Notably, the live collaboration/Realtime/notifications flows (V11.1–V11.2) were verified structurally but **not** confirmed against two real signed-in accounts — every session that built them hit Supabase's signup rate limit before that could be tested live. Worth two real accounts + two browser tabs on a shared event as a first manual check.
 7. **`supabase/schema.sql` doesn't match the deployed schema.** It's an early design proposal, superseded piecemeal by the phase files — see § 7 for the real shape and the divergences (column names, when RLS switched to the collaborative model). Don't use it as a reference for the live database.

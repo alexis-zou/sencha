@@ -3,31 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppState } from '@/context/AppStateContext';
 import { uid } from '@/lib/id';
-import { FlavorOption, MenuItem, MenuItemType } from '@/lib/types';
-
-interface Row {
-  id: string;
-  name: string;
-  price: string;
-}
-
-const newRow = (): Row => ({ id: uid(), name: '', price: '' });
+import { Row, newRow, rowsToMenuItems, rowsToFlavorOptions, findRowMissingPrice } from '@/lib/menuRows';
 
 const PAGE_COUNT = 4;
 const PAGE_TITLES = ['Event details', 'Build your menu', 'Starting inventory', 'Invite your team'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function rowsToMenuItems(rows: Row[], type: MenuItemType): MenuItem[] {
-  return rows
-    .map((r) => ({ id: r.id, name: r.name.trim(), price: parseFloat(r.price), type }))
-    .filter((m) => m.name && !isNaN(m.price));
-}
-
-function rowsToFlavorOptions(rows: Row[]): FlavorOption[] {
-  return rows
-    .map((r) => ({ id: r.id, name: r.name.trim(), price: parseFloat(r.price || '0') || 0 }))
-    .filter((f) => f.name);
-}
 
 export default function SetupScreen() {
   const { goHome, createEvent, saveMenuTemplate, loadMenuTemplate, checkEmailRegistered, inviteMember, debugWhoAmI } =
@@ -109,15 +89,6 @@ export default function SetupScreen() {
     });
     setSavedMsg('Saved — this menu will prefill your next pop-up.');
     setTimeout(() => setSavedMsg(''), 2400);
-  }
-
-  // Drinks and additional items both require a price (syrup/milk don't) --
-  // a row with a name but no valid price would otherwise be silently
-  // dropped by rowsToMenuItems with no feedback, vanishing from every
-  // later screen (inventory, order picker, summary) with no trace.
-  function findRowMissingPrice(rows: Row[]): string | null {
-    const row = rows.find((r) => r.name.trim() && isNaN(parseFloat(r.price)));
-    return row ? row.name.trim() : null;
   }
 
   function handleContinueFromMenu() {

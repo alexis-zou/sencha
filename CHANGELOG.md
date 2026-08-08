@@ -433,4 +433,18 @@ A team member can now optionally take down a customer's phone number when buildi
 - **`OrderPanel.tsx`**: one new optional `tel` input under the existing note field, using the same `.text-input` styling every other secondary field in the app already uses (not the note field's special handwritten/dashed treatment, since this isn't the ticket's headline text).
 - Threaded `customerPhone` through the full existing order-mutation path end to end (`lib/types.ts`'s `Order`, `lib/supabase/orders.ts`'s row mapping/`createOrder`/`updateOrder`, `AppStateContext`'s `addOrder`/`editOrder`) — same shape as every other order field, so it survives reloads and syncs across devices/teammates the normal way.
 
-`tsc --noEmit` clean. Migration not yet run against the live project.
+`tsc --noEmit` clean. Migration confirmed run against the live project; deployed to production.
+
+---
+
+## V12.1 — Edit the menu mid-event, from Settings (2026-08-07)
+
+The menu, syrup list, and milk list were locked in at setup — the only stated-known gap in the collaborative-stand feature set (see `CLAUDE.md` § 6 and `ROADMAP.md` #8). `SettingsModal` now has a full menu editor: add/rename/reprice/remove rows for Drinks, Syrup, Milk, and Additional items, identical in behavior to the setup wizard's own menu page.
+
+**Shared editing model, not a duplicate.** The row-based draft shape (`{ id, name, price }`, string price so a half-typed input doesn't need to round-trip through `NaN`) and its conversions to/from the real `MenuItem`/`FlavorOption` types moved out of `SetupScreen.tsx` into a new `lib/menuRows.ts`, so both screens share one implementation instead of `SettingsModal` growing a second copy of logic that already existed.
+
+**The actual hard part was the sync, not the form.** Setup only ever inserts; editing has to update-in-place, insert new rows, and delete removed ones, while a matcha stand's inventory rows are keyed off `menu_items.id` — a brand-new row doesn't have a real id yet when the person is still typing. `updateEventSettingsRemote` (`lib/supabase/events.ts`) now diffs the submitted menu/syrup/milk lists against the event's current state by id: existing ids get an `update` (only issued if something actually changed), ids no longer present get `delete`d, and everything else is a fresh `insert` — for menu items specifically, each insert is followed by an `inventory` row using the starting count the person entered against that item's *temporary* client-side id, resolved to the real id Postgres just generated. The function returns the fully resolved menu/inventory/syrup/milk lists (real ids included) rather than the patch that was sent, and `AppStateContext` replaces local state with that response instead of merging its own patch — new items would otherwise sit in local state under a client id that no longer matches anything in the database.
+
+**Confirmed safe for past orders**, per the original roadmap entry's own watch-out: `order_items` denormalizes `item_name`/`price` at order time and isn't touched by this sync at all (`orders.item_id` also isn't a foreign key — see `orders_phase.sql`), so renaming or repricing a menu item, or deleting it entirely, never changes what an already-placed order displays.
+
+No RLS changes needed — `menu_items`/`flavor_options`/`inventory`'s existing "members can access" policies (`for all`) already cover insert/update/delete, not just the select/insert-at-creation paths that had been exercised so far.

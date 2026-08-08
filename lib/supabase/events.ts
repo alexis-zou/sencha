@@ -209,13 +209,129 @@ export interface EventSettingsPatch {
   startTime?: string;
   endTime?: string;
   inventory?: Record<string, number>;
+  // Full desired list, not a diff -- existing items keep their real id
+  // (so they're updated in place), brand-new rows carry a client-only
+  // temp id (so they're detected as inserts and get a real id back).
+  // Compared against `existingMenu`/`existingSyrups`/`existingMilks`
+  // (the event's current state) to work out what changed.
+  menu?: MenuItem[];
+  syrups?: FlavorOption[];
+  milks?: FlavorOption[];
+}
+
+export interface EventSettingsSyncResult {
+  menu?: MenuItem[];
+  inventory?: Record<string, number>;
+  syrups?: FlavorOption[];
+  milks?: FlavorOption[];
+}
+
+// Diffs `desired` against `existing` by id and issues the minimal set of
+// update/insert/delete calls -- reused for both menu items (which also
+// need a matching inventory row per insert) and flavor options (which
+// don't track inventory at all).
+async function syncMenuItems(
+  supabase: SupabaseClient,
+  eventId: string,
+  desired: MenuItem[],
+  existing: MenuItem[],
+  desiredInventory: Record<string, number> | undefined
+): Promise<{ menu: MenuItem[]; inventory: Record<string, number> }> {
+  const existingById = new Map(existing.map((m) => [m.id, m]));
+  const desiredIds = new Set(desired.map((m) => m.id));
+
+  const toUpdate = desired.filter((m) => existingById.has(m.id));
+  const toInsert = desired.filter((m) => !existingById.has(m.id));
+  const toDeleteIds = existing.filter((m) => !desiredIds.has(m.id)).map((m) => m.id);
+
+  const tasks: PromiseLike<{ error: { message: string } | null }>[] = [];
+  toUpdate.forEach((m) => {
+    const prev = existingById.get(m.id)!;
+    if (prev.name !== m.name || prev.price !== m.price || prev.type !== m.type) {
+      tasks.push(supabase.from('menu_items').update({ name: m.name, price: m.price, type: m.type }).eq('id', m.id));
+    }
+  });
+  if (toDeleteIds.length > 0) {
+    tasks.push(supabase.from('menu_items').delete().in('id', toDeleteIds));
+  }
+  const results = await Promise.all(tasks);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
+
+  let inserted: MenuItem[] = [];
+  if (toInsert.length > 0) {
+    const { data, error } = await supabase
+      .from('menu_items')
+      .insert(
+        toInsert.map((m, i) => ({
+          event_id: eventId,
+          name: m.name,
+          price: m.price,
+          type: m.type,
+          sort_order: existing.length + i,
+        }))
+      )
+      .select('id, name, price, type');
+    if (error || !data) throw error || new Error('Failed to add menu items');
+    inserted = (data as MenuItemRow[]).map(toMenuItem);
+    const invPayload = inserted.map((m, i) => ({
+      menu_item_id: m.id,
+      starting_count: desiredInventory?.[toInsert[i].id] ?? 0,
+    }));
+    const { error: invErr } = await supabase.from('inventory').insert(invPayload);
+    if (invErr) throw invErr;
+  }
+
+  const finalMenu = [...toUpdate, ...inserted];
+  const finalInventory: Record<string, number> = {};
+  toUpdate.forEach((m) => {
+    finalInventory[m.id] = desiredInventory?.[m.id] ?? 0;
+  });
+  inserted.forEach((m, i) => {
+    finalInventory[m.id] = desiredInventory?.[toInsert[i].id] ?? 0;
+  });
+
+  return { menu: finalMenu, inventory: finalInventory };
+}
+
+async function syncFlavorOptions(
+  supabase: SupabaseClient,
+  eventId: string,
+  kind: 'syrup' | 'milk',
+  desired: FlavorOption[],
+  existing: FlavorOption[]
+): Promise<FlavorOption[]> {
+  const existingById = new Map(existing.map((f) => [f.id, f]));
+  const desiredIds = new Set(desired.map((f) => f.id));
+
+  const toUpdate = desired.filter((f) => existingById.has(f.id));
+  const toInsert = desired.filter((f) => !existingById.has(f.id));
+  const toDeleteIds = existing.filter((f) => !desiredIds.has(f.id)).map((f) => f.id);
+
+  const tasks: PromiseLike<{ error: { message: string } | null }>[] = [];
+  toUpdate.forEach((f) => {
+    const prev = existingById.get(f.id)!;
+    if (prev.name !== f.name || prev.price !== f.price) {
+      tasks.push(supabase.from('flavor_options').update({ name: f.name, price: f.price }).eq('id', f.id));
+    }
+  });
+  if (toDeleteIds.length > 0) {
+    tasks.push(supabase.from('flavor_options').delete().in('id', toDeleteIds));
+  }
+  const results = await Promise.all(tasks);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
+
+  const inserted = await insertFlavorOptions(supabase, eventId, kind, toInsert);
+  return [...toUpdate, ...inserted];
 }
 
 export async function updateEventSettingsRemote(
   supabase: SupabaseClient,
   eventId: string,
-  patch: EventSettingsPatch
-): Promise<void> {
+  patch: EventSettingsPatch,
+  existing: Pick<PopupEvent, 'menu' | 'syrups' | 'milks'>
+): Promise<EventSettingsSyncResult> {
   const eventPatch: Record<string, string> = {};
   if (patch.eventName !== undefined) eventPatch.event_name = patch.eventName;
   if (patch.eventDate !== undefined) eventPatch.event_date = patch.eventDate;
@@ -226,7 +342,11 @@ export async function updateEventSettingsRemote(
   if (Object.keys(eventPatch).length > 0) {
     tasks.push(supabase.from('events').update(eventPatch).eq('id', eventId));
   }
-  if (patch.inventory) {
+  // Only touched here when the menu itself isn't also changing --
+  // syncMenuItems folds inventory writes for changed items in below,
+  // since new items need a real id back before their inventory row
+  // can be inserted.
+  if (patch.inventory && !patch.menu) {
     Object.entries(patch.inventory).forEach(([menuItemId, count]) => {
       tasks.push(supabase.from('inventory').update({ starting_count: count }).eq('menu_item_id', menuItemId));
     });
@@ -234,6 +354,20 @@ export async function updateEventSettingsRemote(
   const results = await Promise.all(tasks);
   const failed = results.find((r) => r.error);
   if (failed?.error) throw failed.error;
+
+  const result: EventSettingsSyncResult = {};
+  if (patch.menu) {
+    const { menu, inventory } = await syncMenuItems(supabase, eventId, patch.menu, existing.menu, patch.inventory);
+    result.menu = menu;
+    result.inventory = inventory;
+  }
+  if (patch.syrups) {
+    result.syrups = await syncFlavorOptions(supabase, eventId, 'syrup', patch.syrups, existing.syrups);
+  }
+  if (patch.milks) {
+    result.milks = await syncFlavorOptions(supabase, eventId, 'milk', patch.milks, existing.milks);
+  }
+  return result;
 }
 
 export async function endEventRemote(supabase: SupabaseClient, eventId: string): Promise<void> {

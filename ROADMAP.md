@@ -29,8 +29,8 @@ Events, Inventory, Settings, and Orders all read/write Supabase now, scoped by r
 ### 7. Add a delete-order confirmation
 Currently 🗑 removes an order instantly with no undo. A lightweight native `confirm()` (consistent with the End Event / stock-warning pattern already in the app) is enough — no need for a custom modal.
 
-### 8. Allow menu/add-ons/syrup edits mid-event
-Currently the menu, add-ons, and syrup list are locked in at setup; only event name/date and the three inventory counts are editable via Settings afterward. Extend `SettingsModal` (or a dedicated "Edit menu" screen) to allow adding/renaming/repricing/removing items after the event has started. Watch out for: changing a price shouldn't retroactively change past orders' line-item prices (line items already denormalize `price`/`itemName` onto themselves for exactly this reason — see the schema note in `CLAUDE.md` § 7).
+### 8. ~~Allow menu/add-ons/syrup edits mid-event~~ — Done (V12.1)
+`SettingsModal` gained the same add/rename/reprice/remove row editor `SetupScreen`'s menu page already used (now shared via `lib/menuRows.ts`), for Drinks, Syrup, Milk, and Additional items, plus the Starting Inventory section now tracks whatever's currently in the editor rather than the event's original menu — so a newly-added item gets an inventory field immediately, and a removed one loses it. Changing a price does **not** retroactively change past orders' line-item prices, per this entry's original watch-out — confirmed still true, since line items denormalize `price`/`itemName` onto themselves at order time (see `CLAUDE.md` § 7) and nothing in the new sync path touches existing `order_items` rows.
 
 ### 9. Add ingredient-cost input + true profit/margin
 Per `DECISIONS.md`'s product-decision note: add an optional cost-per-unit field (at the menu-item level, at setup or in the new mid-event menu editor from #8), and show a margin figure *alongside* the existing "Income" figure — don't replace Income with margin, since gross revenue is still useful on its own.

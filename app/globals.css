@@ -304,6 +304,9 @@
   .settings-invite-row .text-input{ flex: 1; }
   .settings-invite-row .add-row-btn{ width: auto; flex: none; margin-top: 0; padding: 12px 16px; white-space: nowrap; }
 
+  .settings-section-header{ display:flex; align-items:center; justify-content:space-between; gap: 10px; margin-bottom: 7px; }
+  .settings-section-header .add-row-btn{ width: auto; flex: none; margin-top: 0; padding: 9px 14px; white-space: nowrap; }
+
   /* ---------- Setup wizard (swipeable pages) ---------- */
   .wizard-dots{ display:flex; justify-content:center; gap: 8px; margin-bottom: 18px; }
   .wizard-dot{ width: 8px; height: 8px; border-radius: 50%; border: none; background: var(--light); padding: 0; transition: background 0.2s ease, transform 0.2s ease; }

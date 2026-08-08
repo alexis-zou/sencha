@@ -100,7 +100,7 @@ export default function OrderPanel({
         <input
           className="text-input"
           type="tel"
-          placeholder="For a pickup-ready text — leave blank to skip"
+          placeholder="Be notified when your order's ready!"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
         />

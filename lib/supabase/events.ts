@@ -150,19 +150,28 @@ export async function createEventRemote(
   userId: string,
   input: NewEventInput
 ): Promise<PopupEvent> {
-  const { data: eventRow, error } = await supabase
-    .from('events')
-    .insert({
-      user_id: userId,
-      event_name: input.eventName,
-      event_date: input.eventDate || null,
-      start_time: input.startTime || null,
-      end_time: input.endTime || null,
-    })
-    .select('id, event_name, event_date, start_time, end_time, status, created_at, ended_at')
-    .single();
-  if (error || !eventRow) throw error || new Error('Failed to create event');
-  const eventId = (eventRow as EventRow).id;
+  // Deliberately NOT chaining .select() on this insert. Doing so asks
+  // Postgres to hand the new row back via RETURNING, which requires
+  // re-checking it against `events`' own SELECT-side RLS policy
+  // (is_event_member) -- but that only becomes true once
+  // handle_new_event()'s AFTER INSERT trigger adds the matching
+  // event_members row, a step RETURNING can race. That race is the
+  // real cause of the "42501 new row violates row-level security
+  // policy" error a fresh account hit on its very first event -- not
+  // a bad policy, a bad assumption that RETURNING was free. Generating
+  // the id client-side sidesteps it entirely: nothing needs to come
+  // back from this insert at all.
+  const eventId = crypto.randomUUID();
+  const createdAt = new Date();
+  const { error } = await supabase.from('events').insert({
+    id: eventId,
+    user_id: userId,
+    event_name: input.eventName,
+    event_date: input.eventDate || null,
+    start_time: input.startTime || null,
+    end_time: input.endTime || null,
+  });
+  if (error) throw error;
 
   async function insertMenuAndInventory(): Promise<{ menu: MenuItem[]; inventory: Record<string, number> }> {
     if (input.menu.length === 0) return { menu: [], inventory: {} };
@@ -194,7 +203,14 @@ export async function createEventRemote(
   ]);
 
   return {
-    ...eventRowToBase(eventRow as EventRow),
+    id: eventId,
+    eventName: input.eventName,
+    eventDate: input.eventDate || '',
+    startTime: input.startTime || '',
+    endTime: input.endTime || '',
+    status: 'active',
+    createdAt: createdAt.getTime(),
+    endedAt: null,
     menu,
     inventory,
     syrups,

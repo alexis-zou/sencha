@@ -10,8 +10,7 @@ const PAGE_TITLES = ['Event details', 'Build your menu', 'Starting inventory', '
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SetupScreen() {
-  const { goHome, createEvent, saveMenuTemplate, loadMenuTemplate, checkEmailRegistered, inviteMember, debugWhoAmI } =
-    useAppState();
+  const { goHome, createEvent, saveMenuTemplate, loadMenuTemplate, checkEmailRegistered, inviteMember } = useAppState();
 
   const [page, setPage] = useState(0);
 
@@ -177,17 +176,8 @@ export default function SetupScreen() {
       if (inviteEmails.length > 0) {
         await Promise.all(inviteEmails.map((email) => inviteMember(newEvent.id, email)));
       }
-    } catch (err) {
-      // TEMPORARY DEBUG -- diagnosing the events-insert RLS failure.
-      // Supabase's error objects have a `.message` but aren't actual
-      // `Error` instances, so `instanceof Error` was always false here
-      // and this fell through to `String(err)` -> "[object Object]".
-      const who = await debugWhoAmI();
-      const detail =
-        err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : String(err);
-      const code =
-        err && typeof err === 'object' && 'code' in err ? ` (code: ${String((err as { code: unknown }).code)})` : '';
-      setError(`Could not create your stand. DEBUG: ${detail}${code} | whoami: ${who}`);
+    } catch {
+      setError('Could not create your stand — check your connection and try again.');
       setSubmitting(false);
     }
   }

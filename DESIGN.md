@@ -2,7 +2,7 @@
 
 ## Design mission
 
-Matcha Stand should feel like a **personal project binder for a small, homemade business** — warm, handmade, a little playful — not enterprise software wearing a green skin. Every visual decision should trace back to either (a) making the core loop (log order → mark complete → see stock/income) faster under time pressure, or (b) reinforcing that homemade, scrapbook feeling. If a visual idea does neither, it probably doesn't belong.
+Sencha should feel like a **personal project binder for a small, homemade business** — warm, handmade, a little playful — not enterprise software wearing a green skin. Every visual decision should trace back to either (a) making the core loop (log order → mark complete → see stock/income) faster under time pressure, or (b) reinforcing that homemade, scrapbook feeling. If a visual idea does neither, it probably doesn't belong.
 
 Reference inspiration: hand-labeled tea packaging (scalloped card edges, monoline icons, condensed serif wordmark, thin all-caps labels) and printed ticket/receipt stubs (dotted leader lines, torn/scalloped edges, ticket stub proportions).
 
@@ -87,11 +87,12 @@ All colors are matcha/earth tones — no arbitrary "brand blue" or unrelated acc
 
 ## Component patterns worth reusing
 
-- **Modal sheets** (`ItemPickerModal`, `SettingsModal`) slide up from the bottom, full-width, rounded top corners only — consistent "bottom sheet" pattern for anything that's a focused sub-task within a larger flow. Don't introduce a second modal style (e.g. centered dialog) without a clear reason.
+- **Modal sheets** (`ItemPickerModal`, `SettingsModal`) slide up from the bottom, full-width, rounded top corners only — the pattern for anything that's a focused sub-task within a larger flow (configuring an order line, editing event settings).
+- **Centered floating popups** (`NotificationBell`'s dropdown) are a deliberate second pattern, not a lapse in the rule above: a compact card, centered on screen, translucent with a background blur, draggable by its header to wherever the person wants it out of the way. Reserved for things that are glanced at and dismissed rather than worked in — a short, skimmable list, not a form or a multi-field task. If it has form fields or a primary action to complete, it's a bottom sheet; if it's read-mostly and someone might want to park it somewhere specific while working around it, it's a centered popup. Don't add a third modal shape without updating this rule to explain when it applies.
 - **Empty states** always pair a short handwritten-font headline with one clarifying sentence in body text (see `.empty-state .display` + regular text) — e.g. "All caught up / No pending orders — add one above when the next customer orders." Every list in the app (events, pending orders, completed orders) should have one; don't ship a list that can just render blank.
 - **Status badges** (Active/Ended) use filled pill shapes with the palette's semantic colors (sage = good, pale = neutral/past). Inventory status uses a two-step scale instead (sage = plenty, `--danger-light` soft red = low under 10, full `--danger` = out) — no amber step. Keep whichever mapping you're extending consistent with its own scale rather than mixing the two.
 - **"Juicy" 3D buttons**: every primary action button gets a bottom-rim `box-shadow` (a darker shade of its own background) reading as physical depth, and translates down + flattens its shadow on `:active` rather than just scaling down. Any new primary CTA should follow this, not a flat/scale-only press state.
-- **Bell + toast, for anything "live"**: real-time updates (a teammate's order change) surface two ways at once — a persistent unread badge on `NotificationBell` (for catching up later) and a transient, auto-dismissing, stacking toast via `ToastHost` (for noticing right now, wherever you are in the app). If a future feature needs to surface a live cross-user event, reuse this pair rather than inventing a third notification mechanism.
+- **Bell + toast, for anything "live"**: real-time updates (a teammate's order change) surface two ways at once — a persistent unread badge on `NotificationBell` opening the centered popup above (for catching up later) and a transient, auto-dismissing, stacking toast via `ToastHost` (for noticing right now, wherever you are in the app). Toasts spawn at the top of the screen and can be dragged anywhere by the person (a quick tap still dismisses; a drag doesn't). If a future feature needs to surface a live cross-user event, reuse this pair rather than inventing a third notification mechanism.
 
 ---
 

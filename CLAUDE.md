@@ -16,7 +16,7 @@ The project started as a single-file HTML/CSS/JS prototype (built and iterated l
 
 **Core jobs the app does:**
 1. Track incoming orders as a checklist (incomplete → completed) without losing any mid-rush.
-2. Track remaining stock (matcha, salt bread, matcha cookies) so the stand doesn't oversell.
+2. Track remaining stock for every menu item (originally a fixed matcha/bread/cookie trio; generalized in V7 to whatever the stand actually sells) so the stand doesn't oversell.
 3. Calculate income earned so far, automatically, from completed orders.
 
 ---
@@ -42,7 +42,7 @@ Design/product principles that fall out of this (see `DESIGN.md` for the full wr
 - **Fonts:** Google Fonts `Patrick Hand` (headings — handwritten scrapbook feel), `Quicksand` (body — clean, round, minimal), and `Cormorant Garamond` (scoped narrowly to the "sencha" brand wordmark), loaded via CSS `@import` (same mechanism the prototype used).
 - **State management:** React Context (`context/AppStateContext.tsx`) with `useState`/`useMemo`, no external state library.
 - **Backend:** [Supabase](https://supabase.com) — hosted Postgres, Auth, and Realtime. `lib/supabase/*.ts` is the only layer that talks to it directly (see § 4); everything above that layer, including every component, still speaks only in the app's own `PopupEvent`/`Order`/etc. types from `lib/types.ts`.
-- **Auth:** real Supabase Auth (email/password, session cookies, email confirmation) — replaced the original prototype's plaintext `localStorage` password map in V11 (see `CHANGELOG.md`, `DECISIONS.md`).
+- **Auth:** real Supabase Auth (email/password, session cookies) — replaced the original prototype's plaintext `localStorage` password map in V11 (see `CHANGELOG.md`, `DECISIONS.md`). Email confirmation was later turned off in the Supabase dashboard (a signed-up account gets a session immediately, no "check your email" step) — see `DECISIONS.md`.
 - **Database:** Postgres, reached via PostgREST through the Supabase client libraries — there is no hand-written API server. Access control is enforced entirely by Postgres **Row Level Security**, not application code — see § 7.
 - **Realtime sync:** Supabase Realtime broadcasts order (and notification) changes live to every client viewing an event — teammates on a shared stand, or the same user on two devices.
 - **Persistence:** almost everything lives in Postgres now. Browser `localStorage`, wrapped behind a small async `storage` module (`lib/storage.ts`, mirroring the original prototype's `window.storage.get/set/delete` interface) still exists but is only used for the reusable **menu template** ("save this menu for next time") — accounts, events, and orders have all migrated off it.
@@ -77,7 +77,7 @@ User's browser
               translate rows <-> the app's PopupEvent/Order/etc. types
   ↕ HTTPS (PostgREST) + WebSocket (Realtime), straight from the browser
 Supabase
-  ├─ Auth — accounts, sessions, email confirmation
+  ├─ Auth — accounts, sessions (email confirmation off — see § 4 tech stack)
   ├─ Postgres — events, menu_items, inventory, flavor_options, orders,
   │             order_items, users, event_members, notifications
   ├─ Row Level Security — the entire permission system (see § 7); every
@@ -101,7 +101,7 @@ See `lib/types.ts` for the full shape of `PopupEvent`, `Order`, `MenuItem`, etc.
 
 ### Accounts & navigation
 - **Landing page** (`LandingScreen.tsx`) is the first thing a fresh/logged-out visitor sees — the real brand-mark image (`public/sencha-logo.png`, the full icon+wordmark+tagline lockup), a blurb, and a "Get started" button into sign-in. A **returning signed-in visitor skips it entirely**: `AppStateContext`'s bootstrap effect checks for a saved session before deciding whether the initial view is `'landing'` or straight to `'home'`, so the pitch page never gets in a returning user's way.
-- **Real email/password accounts**, via Supabase Auth — session persistence, email confirmation, and sign-out that actually invalidates the session, not just a local flag. See § 4 and `DECISIONS.md`.
+- **Real email/password accounts**, via Supabase Auth — session persistence, an immediate session on sign-up (email confirmation is off, see § 4/`DECISIONS.md`), and sign-out that actually invalidates the session, not just a local flag.
 - Home screen listing every pop-up event the signed-in user **owns or has been invited to** (active + ended), sorted newest-first, each showing income and order count.
 - "+ New pop-up event" → setup flow → active event view.
 - Back navigation from an active event to Home without ending it.
@@ -229,8 +229,9 @@ interface MenuTemplate { menu: MenuItem[]; syrups: FlavorOption[]; milks: Flavor
 4. **`notifications_phase.sql`** — adds `notifications`, populated only by a `security definer` trigger on `orders` (never inserted by client code).
 5. **`realtime_phase.sql`** — adds `orders` to the Realtime publication.
 6. **`fix_event_members_recursion.sql`** — fixes a real production bug (see below); introduces `is_event_member()`, now the standard way every policy checks membership.
-7. **`rls_hardening_phase.sql`** — an audit pass on top of the (buggy, at the time) collaborative policies: makes `to authenticated` and `revoke ... from anon` explicit everywhere. Also carried the recursion bug forward unchanged (fixed in #6); its `notifications` change was partially reverted by an uncommitted `undo_rls_hardening_phase.sql` — see § 11 #10.
+7. **`rls_hardening_phase.sql`** — an audit pass on top of the (buggy, at the time) collaborative policies: makes `to authenticated` and `revoke ... from anon` explicit everywhere. Also carried the recursion bug forward unchanged (fixed in #6); its `notifications` change was partially reverted by `undo_rls_hardening_phase.sql` — committed, but not confirmed run against the live database, see § 11 #10.
 8. **`customer_sms_phase.sql`** — adds a nullable `orders.customer_phone`. No RLS change (the existing membership policy already covers every column), no trigger, no third-party API — see § 5 "Optional customer pickup text" and `CHANGELOG.md` V12 for why this one deliberately isn't server-driven like everything else in this list.
+9. **`realtime_event_members_phase.sql`** — adds `event_members` to the Realtime publication, so a client can subscribe to "was I just added to an event's roster?" — see the fix below and `CHANGELOG.md` V12.2.
 
 The live shape, in short:
 ```
@@ -250,6 +251,8 @@ public.notifications    id, user_id, event_id, type, payload (jsonb), is_read, c
 **Row Level Security is the entire permission system** — there is no separate application-layer authorization check anywhere in the codebase. Every policy reduces to one shape: "does a row exist in `event_members` for (this event, `auth.uid()`)?" `rls_hardening_phase.sql` also revokes all table privileges from the `anon` role explicitly, so unauthenticated requests are blocked outright, not just implicitly.
 
 **A real RLS bug worth understanding, not just fixing.** `event_members`'s own membership-check policy originally queried `event_members` *from within a policy on `event_members`* — evaluating that subquery re-applies the same policy, which needs to evaluate the subquery again, forever (Postgres error `42P17`, infinite recursion). Because six other tables all check membership by querying `event_members` from their own policies, this one self-referential policy broke nearly the entire schema, not just the roster view. The fix, in `fix_event_members_recursion.sql`, is the standard pattern for self-referential RLS: a `security definer` function (`is_event_member(event_id, user_id)`) that queries `event_members` directly. `security definer` functions run as their owner, and table owners bypass RLS by default, so the function's internal query never re-triggers the policy that called it — breaking the cycle. Every membership check in the schema now goes through this function instead of repeating its own inline subquery, specifically so this class of bug can't quietly reappear in one call site without every other one being re-audited by hand. Worth remembering as a general rule: **a table's own RLS policy should never query that same table**, directly or indirectly — route through a `security definer` function instead.
+
+**A second RLS bug, easy to mistake for the first one: `RETURNING` races a trigger.** A brand-new account's very first "Start selling" kept failing with the same-looking `42501 new row violates row-level security policy for table "events"`, even after the recursion fix above — but this was never a policy-logic bug. `createEventRemote()` chained `.select().single()` onto the `events` insert, which requests the row back via `RETURNING`; Postgres re-checks a `RETURNING` row against the table's own SELECT policy (`is_event_member(id, auth.uid())`), which only becomes true once `handle_new_event()`'s `AFTER INSERT` trigger adds the matching `event_members` row — a race the check could lose. The fix (`lib/supabase/events.ts`) generates the event's id client-side and drops `.select()` from that one insert, so nothing needs to come back from it at all. See `DECISIONS.md` for the full writeup and `CHANGELOG.md` V12.4. Worth remembering as its own general rule, distinct from the one above: **don't request a row back via `RETURNING`/`.select()` if a same-transaction trigger is what makes that row visible to its own policy** — query it separately, after the trigger has definitely run, or avoid needing it back at all.
 
 Storage keys still in use in `localStorage` (everything else has moved to Postgres — see above):
 | Key | Contents |
@@ -319,18 +322,20 @@ All pure calculation logic lives in `lib/calculations.ts` (no side effects, full
 
 ## 11. Known Bugs / Gaps
 
-Nothing here is *currently* a confirmed broken-behavior bug in production (the recursion bug in #9 below was one, and is fixed) — these are known rough edges and tracked loose ends:
+Nothing here is *currently* a confirmed broken-behavior bug in production — three real ones have hit production and been fixed (the RLS recursion bug, § 7; the `RETURNING`/RLS race on event creation, § 7 and #12 below; and the leftover diagnostic policy, #11 below). Everything else here is a known rough edge or tracked loose end, not a live bug:
 
 1. **No in-app password reset flow.** Supabase Auth supports password recovery natively now that accounts are real (see § 4), but no "forgot password" UI has been built to trigger it yet — a forgotten password still has no recovery path from inside the app today.
 2. ~~`localStorage` is per-browser, per-device.~~ **Resolved for accounts, events, and orders** — all three now live in Postgres and sync across devices/browsers via Supabase Auth + Realtime (`CHANGELOG.md` V11). The one thing still local-only is the reusable **menu template**, a low-stakes convenience feature, not core data.
 3. **No delete confirmation on orders.** Tapping 🗑 removes an order immediately, no undo.
 4. ~~Menu/add-ons/syrups are locked at setup.~~ **Resolved (V12.1).** `SettingsModal` now has a full add/rename/reprice/remove editor for the menu, syrup, and milk lists, in addition to team membership, inventory counts, and event name/date.
-5. ~~Auth is not secure.~~ **Resolved.** Real Supabase Auth (hashed passwords, real sessions, email confirmation) replaced the plaintext `localStorage` password map in V11. Data access for everything else now runs through Postgres Row Level Security (§ 7), not any application-level check.
-6. **No automated tests exist yet.** Manual verification (`tsc --noEmit`, production build, click-through) is the only validation method used so far. Notably, the live collaboration/Realtime/notifications flows (V11.1–V11.2) were verified structurally but **not** confirmed against two real signed-in accounts — every session that built them hit Supabase's signup rate limit before that could be tested live. Worth two real accounts + two browser tabs on a shared event as a first manual check.
+5. ~~Auth is not secure.~~ **Resolved.** Real Supabase Auth (hashed passwords, real sessions) replaced the plaintext `localStorage` password map in V11. Data access for everything else now runs through Postgres Row Level Security (§ 7), not any application-level check. (V11 shipped with email confirmation on; it was later turned off — see § 4 and `DECISIONS.md`. Doesn't affect this item, which is about password storage, not confirmation.)
+6. **No automated tests exist yet.** Manual verification (`tsc --noEmit`, production build, click-through) is the only validation method used so far. Notably, the live collaboration/Realtime/notifications flows (V11.1–V11.2) were verified structurally but **not yet confirmed against two real signed-in accounts** — every attempt so far hit Supabase's signup rate limit before that could be tested live. That specific blocker should no longer apply: email confirmation is now off (§ 4/`DECISIONS.md`), so signing up no longer sends an email at all, and the rate limit was on confirmation emails specifically. Still worth two real accounts + two browser tabs on a shared event as a first manual check, now that it should actually be possible.
 7. **`supabase/schema.sql` doesn't match the deployed schema.** It's an early design proposal, superseded piecemeal by the phase files — see § 7 for the real shape and the divergences (column names, when RLS switched to the collaborative model). Don't use it as a reference for the live database.
 8. **`orders.event_id` has no foreign key to `events.id`.** A known, deliberate loose end from the Orders→Events migration order (see § 7, `inventory_events_phase.sql`'s header comment) — tightening it needs either a data cleanup or a backfill that wasn't safe to attempt blind.
-9. **Live temporary debug code, not yet removed.** While diagnosing the `event_members` RLS recursion bug (`CHANGELOG.md` V11.4), a `debug_whoami()` Postgres RPC plus a `debugWhoAmI()` call in `context/AppStateContext.tsx` and a debug branch in `components/SetupScreen.tsx`'s create-event error handler were added to surface Postgres's view of `auth.uid()` on a failing request. **The bug is now fixed, but this diagnostic was never removed** — it's still live, clearly marked `TEMPORARY DEBUG` in both files. Should come out (client code + the `debug_whoami()` function in the database) once nobody needs it.
-10. **An RLS hardening revert is drafted but not committed.** `supabase/undo_rls_hardening_phase.sql` (untracked) reverts `rls_hardening_phase.sql`'s change to the `notifications` table specifically (removing the explicit `to authenticated`) — its header explains why every other table it touched doesn't need reverting (superseded by the recursion fix, or byte-identical to an earlier policy). Needs a decision on whether to run/commit it or discard it.
+9. ~~Live temporary debug code, not yet removed.~~ **Resolved (`CHANGELOG.md` V12.4).** `debugWhoAmI()` and its call site in `SetupScreen.tsx` are gone. One loose end still in the *database* (not the codebase): the `debug_whoami()` Postgres function itself was never dropped — harmless, unused, safe to remove whenever convenient (`drop function if exists public.debug_whoami();`).
+10. **An RLS hardening revert is committed but not confirmed run.** `supabase/undo_rls_hardening_phase.sql` reverts `rls_hardening_phase.sql`'s change to the `notifications` table specifically (removing the explicit `to authenticated`) — its header explains why every other table it touched doesn't need reverting (superseded by the recursion fix, or byte-identical to an earlier policy). The file is in the repo; whether it's actually been run against the live database hasn't been confirmed.
+11. **A leftover diagnostic policy briefly broke collaborative visibility entirely, now fixed.** While isolating the bug in #12 below, `events`' RLS policy was temporarily simplified to owner-only (`user_id = auth.uid()`) and not restored afterward — silently breaking every invited teammate's access to shared events (and, for events missing their own backfill row, even some owners' access to their own events) until caught and fixed (`CHANGELOG.md` V12.3). Resolved, but worth internalizing the lesson: a policy swapped in to isolate a bug needs an explicit, tracked revert step, not an implicit "put it back later."
+12. ~~`42501` on a fresh account's first event creation.~~ **Resolved (`CHANGELOG.md` V12.4).** Not a policy bug — `createEventRemote()`'s `.select()` on the `events` insert raced the `handle_new_event()` trigger via `RETURNING`'s own RLS check. Fixed by generating the id client-side and dropping `.select()` from that insert. See § 7's "A second RLS bug" paragraph for the full mechanism. **Not yet confirmed against a live, uncached test** — the fix is deployed and type-checked, but the last live report was inconclusive (turned out to be a stale cached page, not a fresh test of the new code).
 
 ---
 
@@ -340,9 +345,10 @@ Nothing here is *currently* a confirmed broken-behavior bug in production (the r
 - [x] Decide on a real backend — **Supabase**, see `CHANGELOG.md` V11 and `DECISIONS.md`.
 - [x] Migrate auth and event/order persistence off `localStorage` — see `CHANGELOG.md` V11.
 - [x] Fix the `event_members` RLS infinite-recursion bug — see `CHANGELOG.md` V11.4.
-- [ ] Remove the live `TEMPORARY DEBUG` code (§ 11 #9) now that the bug it was diagnosing is fixed.
-- [ ] Decide on and either commit or discard `supabase/undo_rls_hardening_phase.sql` (§ 11 #10).
-- [ ] Verify the collaboration/Realtime/notifications flows against two real signed-in accounts (blocked so far by Supabase's signup rate limit during development — see § 11 #6).
+- [x] Find and fix the actual cause of the event-creation `42501` (a `RETURNING`/RLS race, not a policy bug) — see `CHANGELOG.md` V12.4. Live, uncached verification still pending — see § 11 #12.
+- [x] Remove the live `TEMPORARY DEBUG` code (§ 11 #9) now that the bug it was diagnosing is fixed. (The `debug_whoami()` database function itself is still a harmless leftover — safe to drop whenever convenient.)
+- [ ] Confirm `supabase/undo_rls_hardening_phase.sql` (committed) has actually been run against the live database (§ 11 #10).
+- [ ] Verify the collaboration/Realtime/notifications flows against two real signed-in accounts — should no longer be blocked by the signup rate limit now that email confirmation is off (§ 11 #6).
 - [ ] Add automated tests (unit tests for `lib/calculations.ts` at minimum — they're pure functions and cheap to test).
 - [ ] Decide whether to introduce Tailwind/a component library, or continue with plain CSS (see `DECISIONS.md`).
 - [ ] Add basic e2e smoke coverage (Playwright is already available in this environment's global tooling) for the core loop: sign up → create event → add order → complete order → check income/inventory → end event → view summary — now also worth covering invite-teammate + live sync.
@@ -358,6 +364,7 @@ Full reasoning in `DECISIONS.md`. Headlines:
 - **Supabase over a hand-rolled Postgres+Prisma backend** — bundles Postgres, Auth, and Realtime behind one client library, with Row Level Security replacing what would otherwise be a hand-written authorization layer. See `DECISIONS.md`.
 - **Row Level Security is the *entire* access-control system** — no query in `lib/supabase/*.ts` filters by `user_id`/`event_id` client-side; every read/write relies on Postgres itself only returning/allowing rows the signed-in user has access to. See § 7.
 - **A table's RLS policy must never query that same table** — the standard workaround is a `security definer` function (`is_event_member()`), since such functions run as their owner and bypass RLS, breaking the self-referential cycle that caused the V11.4 recursion bug. See § 7.
+- **Don't request a `RETURNING` row if a same-transaction trigger is what makes it visible to its own policy** — `createEventRemote()` no longer chains `.select()` onto the `events` insert, since that raced `handle_new_event()`'s trigger and caused a real `42501` on a fresh account's first event. See § 7 and `CHANGELOG.md` V12.4.
 - **Order mutations are optimistic; event mutations are not** — `addOrder`/`editOrder`/`toggleOrderDone`/`deleteOrder` update local state before the network write and roll back on failure; `createEvent`/`endActiveEvent`/`updateEventSettings` deliberately await the write first. See `AppStateContext.tsx`'s own comments and § 4.
 - **Postgres `numeric` columns come back from PostgREST as strings, not numbers** — every price field read off a Supabase row is explicitly `Number()`-coerced in `lib/supabase/events.ts`/`orders.ts`. Skipping this turns price math into string concatenation; it's happened once already (`CHANGELOG.md` V11). Keep this in mind when adding a new numeric column.
 - **Superseded migrations stay as an unedited historical record** — when a bug is found in an already-run `.sql` file (e.g. the V11.4 recursion bug), the fix ships as a new file, and the old file gets an annotation pointing at it rather than being rewritten. Don't "clean up" old migration files to match current behavior; they're a log of what actually ran, not living documentation.
@@ -436,7 +443,8 @@ sencha_app/
     ├── realtime_phase.sql
     ├── fix_event_members_recursion.sql    # fixes the RLS recursion bug — see § 7
     ├── rls_hardening_phase.sql
-    ├── undo_rls_hardening_phase.sql       # uncommitted, partial revert — see § 11 #10
+    ├── undo_rls_hardening_phase.sql       # committed, run-status unconfirmed — see § 11 #10
+    ├── realtime_event_members_phase.sql   # event_members realtime — see § 7/§ 5 "Collaboration"
     └── customer_sms_phase.sql             # orders.customer_phone — see § 5/§ 7
 ```
 
@@ -456,9 +464,9 @@ See `ROADMAP.md` for the full list with rationale. Top of the list, in order:
 4. ~~Migrate auth to the real backend~~ — done, `CHANGELOG.md` V11.
 5. ~~Migrate events/orders persistence to the real backend~~ — done, `CHANGELOG.md` V11.
 6. Add a "delete order" confirmation.
-7. Allow menu/add-on/syrup edits mid-event.
+7. ~~Allow menu/add-on/syrup edits mid-event.~~ — done, `CHANGELOG.md` V12.1.
 8. Add ingredient-cost input + true profit/margin display alongside Income.
 9. Add "duplicate event as template" from Home.
 10. ~~Add export/share of a past event summary~~ — done (V8, PDF export via the browser's print dialog).
 
-(continues — see `ROADMAP.md`, whose "Multi-user / shared-stand support" item is also now done: `CHANGELOG.md` V11.1–V11.2. `ROADMAP.md` also tracks newer, post-V11 follow-ups: removing the live debug code, deciding on the drafted RLS-hardening revert, reconciling `supabase/schema.sql`, adding the `orders.event_id` foreign key, and verifying the collaboration flows against real accounts.)
+(continues — see `ROADMAP.md`, whose "Multi-user / shared-stand support" item is also now done: `CHANGELOG.md` V11.1–V11.2. `ROADMAP.md` also tracks newer, post-V11 follow-ups: confirming `undo_rls_hardening_phase.sql` was actually run, reconciling `supabase/schema.sql`, adding the `orders.event_id` foreign key, and verifying the collaboration flows against real accounts now that the signup rate limit shouldn't block it anymore.)

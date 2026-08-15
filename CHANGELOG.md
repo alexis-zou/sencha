@@ -456,3 +456,27 @@ No RLS changes needed — `menu_items`/`flavor_options`/`inventory`'s existing "
 **The bug:** inviting someone from Settings, on an event that already existed, added them to `event_members` correctly (they'd get order notifications for that event right away), but the event itself never showed up as a stand on their Home screen — only a fresh sign-in would surface it. Root cause: `events` is fetched exactly once, in `loadUserInto`, triggered by Supabase's `onAuthStateChange` firing at sign-in. Nothing re-fetched it afterward, so an invited person's local `events` state was simply a stale snapshot from whenever they last logged in — unlike notifications, which are their own always-on Realtime subscription that doesn't depend on the event being in local state at all.
 
 **The fix:** `supabase/realtime_event_members_phase.sql` adds `event_members` to the Realtime publication (same mechanism `realtime_phase.sql` already uses for `orders`). `lib/supabase/members.ts`'s new `subscribeToMembership(supabase, userId, onNewMembership)` listens for `INSERT`s on `event_members` filtered to the signed-in user's own rows; `AppStateContext.tsx` reacts by re-fetching events + orders (extracted the bootstrap's fetch-and-set logic into a shared `refreshEventsAndOrders()`, now called from both `loadUserInto` and this new subscription). A membership row alone doesn't carry a menu/inventory to build a full `PopupEvent` from, so this re-fetches everything rather than trying to assemble the one new event by hand — simple and correct at this app's scale, where being invited to a new stand is a rare event, not a frequent one like an order changing.
+
+---
+
+## V12.3 — Fix: a leftover diagnostic policy silently broke collaborative visibility (2026-08-08)
+
+A different, unrelated bug from V12.2, hitting the same symptom on a different axis: teammates could no longer see events shared with them at all — not even their own events, in one case.
+
+**Cause:** while diagnosing an earlier `42501` on event creation (see V12.4 below for what that bug actually was), `events`' RLS policy had been temporarily simplified to `using (user_id = auth.uid())` — an isolation test to check whether `is_event_member(...)` was the culprit. It wasn't, but the simplified policy was never restored afterward. Left in place, it meant the `events` table's visibility check no longer consulted `event_members` at all: only the original owner of a row could ever see it, silently undoing the entire point of the collaborative-stand feature. Some existing events were affected even for their own owners, for a related reason — their `event_members` backfill row was missing.
+
+**Fix:** restored `events`' policy to the `is_event_member()`-based version from `fix_event_members_recursion.sql` (`using (is_event_member(id, auth.uid()))`, `with check (user_id = auth.uid() or is_event_member(id, auth.uid()))`), and ran a one-off backfill (`insert into event_members select ... where not exists ...`) for any event missing its owner's own membership row. Both are plain SQL, no app-code or deploy involved.
+
+**The lesson, not just the fix:** a policy swapped in for a debugging session is exactly the kind of change that's easy to forget to revert, because the app keeps working for whoever's doing the debugging (the owner). Worth treating any "temporarily simplify this policy to isolate X" step as needing an explicit, tracked revert step, not just an implicit "put it back later."
+
+---
+
+## V12.4 — Fix: the actual root cause of "42501 new row violates row-level security policy" on event creation (2026-08-09)
+
+The real explanation for the `42501` error that prompted the very first debugging session this project hit — misdiagnosed as a policy-logic bug for most of that session, including the (unrelated, now-reverted) simplification in V12.3 above.
+
+**Cause:** `createEventRemote()` chained `.insert(...).select().single()` on the `events` insert. That `.select()` turns the write into `INSERT ... RETURNING ...`, and Postgres re-checks the newly-inserted row against `events`' own SELECT-side RLS policy before handing it back — which depends on `is_event_member(id, auth.uid())`, which only becomes true once `handle_new_event()` (an `AFTER INSERT` trigger) adds the matching `event_members` row. That check could run before the trigger's effect was visible to it, so a brand-new account's very first event could fail with `42501` even though the row's `WITH CHECK` (the actual insert-permission check) had already passed — the error was real, but pointed at the wrong half of the policy.
+
+**Fix:** `createEventRemote()` no longer asks for anything back from the `events` insert. The event's id is generated client-side (`crypto.randomUUID()`), and the `PopupEvent` returned to the caller is assembled from the input data plus that id, sidestepping the `RETURNING`/RLS race entirely rather than trying to win it. See `DECISIONS.md`'s "An insert that a trigger makes visible to itself must not ask Postgres for it back" for the full writeup, including why this needs the same treatment anywhere else the pattern recurs.
+
+**Also removed:** the `TEMPORARY DEBUG` code added while chasing this (`debugWhoAmI()` in `AppStateContext.tsx`, its call site in `SetupScreen.tsx`'s create-event error handler) — no longer needed now that the actual cause is fixed and understood. The `debug_whoami()` Postgres function itself is a leftover in the live database, harmless but no longer used; safe to drop whenever convenient (`drop function if exists public.debug_whoami();`).

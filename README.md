@@ -5,7 +5,7 @@ A web app designed to help young entrepreneurs streamline taking orders, managin
 ### About The Project
 This app was inspired by my own and my friends' experiences running matcha sale fundraisers, farmers' markets, and concession stands. We faced challenges with managing incoming orders (relying primarily on sticky notes), tracking profits, and running out of stock when demand was still high. Sencha was conceptualized to address these issues and help future young entrepreneurs run their own businesses with improved ease and efficiency.  
 
-Tech Stack: Built with Next.js, React, HTML/CSS, Supabase.
+Tech Stack: Built with Next.js, React, HTML/CSS, Supabase. Generated with Claude assistance. 
 
 ### UI Features
 
